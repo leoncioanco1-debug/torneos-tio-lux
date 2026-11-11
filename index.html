@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
       :root {
         --bg: #f4f1ea;
@@ -311,6 +313,18 @@
       footer p { margin: 0; color: var(--muted); font-size: 0.93rem; max-width: 560px; }
       footer .f-links { display: flex; flex-wrap: wrap; gap: 10px 22px; }
       footer .f-links a { min-height: 36px; display: inline-flex; align-items: center; font-weight: 600; text-decoration: none; }
+      /* ---------- Cuenta / verificación ---------- */
+      .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px; margin-bottom: 18px; }
+      .auth-tab { min-height: 44px; border: 1px solid transparent; background: transparent; color: var(--muted); border-radius: 8px; font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 1rem; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; padding: 8px 10px; }
+      .auth-tab.active { background: var(--surface); color: var(--accent-strong); border-color: var(--line); }
+      .turnstile-wrap { display: grid; gap: 6px; }
+      .turnstile-wrap .cf-turnstile { min-height: 65px; }
+      .verified-badge { display: inline-flex; align-items: center; min-height: 28px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--ok); color: var(--ok); font-weight: 700; font-size: .85rem; vertical-align: middle; margin-left: 8px; }
+      .locked-box { border-style: dashed; text-align: left; }
+      .locked-box h3 { font-size: 1.25rem; text-transform: uppercase; margin-bottom: 6px; }
+      .locked-box p { margin: 0; color: var(--muted); }
+      .auth-user { font-size: 1.05rem; margin: 0 0 6px; }
+      .auth-user b { color: var(--ink); }
       .hidden { display: none !important; }
     </style>
   </head>
@@ -446,35 +460,107 @@
       <section id="inscripcion" style="padding-top:26px;">
         <div class="section-head">
           <h2>Inscríbete a la próxima sala</h2>
-          <p>Crea tu perfil de jugador, elige tu modo y termina en WhatsApp con el mensaje listo. Solo falta que envíes tu captura del pago.</p>
+          <p>Para inscribirte necesitas una cuenta verificada. La página, los modos y los premios se ven sin cuenta; la inscripción sí pide registro e inicio de sesión.</p>
         </div>
-        <div class="form-card" id="formatSummary" style="margin-bottom:18px; background: var(--accent-soft); border-color: var(--accent);" aria-live="polite">
+
+        <!-- ================= CUENTA VERIFICADA ================= -->
+        <div class="form-card" id="authCard" style="margin-bottom:18px;">
+          <h3 style="font-size:1.35rem; text-transform:uppercase; margin-bottom:6px;">Tu cuenta de jugador</h3>
+          <p class="fineprint" style="margin-bottom:16px;">Regístrate con tu usuario y correo, completa el captcha, confirma el correo de verificación que te llega y recién inicia sesión para inscribirte. Así evitamos cuentas ficticias o de prueba.</p>
+
+          <div id="authLoading"><p class="fineprint">Comprobando tu sesión…</p></div>
+
+          <div id="authLoggedOut" class="hidden">
+            <div class="auth-tabs" role="tablist" aria-label="Cuenta de jugador">
+              <button type="button" class="auth-tab active" id="tabSignup">Crear cuenta</button>
+              <button type="button" class="auth-tab" id="tabLogin">Iniciar sesión</button>
+            </div>
+
+            <form id="signupForm" novalidate>
+              <div class="form-grid">
+                <div class="half">
+                  <label class="field"><span>Usuario</span>
+                    <input type="text" id="suUser" autocomplete="username" placeholder="Ej.: LuxSombra" required />
+                    <small>Tu nombre de jugador o usuario en Torneos Tío LUX.</small>
+                  </label>
+                  <label class="field"><span>Correo electrónico</span>
+                    <input type="email" id="suEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
+                    <small>A este correo te llega la verificación.</small>
+                  </label>
+                </div>
+                <div>
+                  <label class="field"><span>Contraseña</span>
+                    <input type="password" id="suPass" autocomplete="new-password" placeholder="Crea una contraseña segura" required />
+                  </label>
+                  <ul class="pw-rules" id="suPwRules">
+                    <li data-rule="len">Mínimo 8 caracteres</li>
+                    <li data-rule="upper">Al menos una mayúscula</li>
+                    <li data-rule="num">Al menos un número</li>
+                    <li data-rule="sym">Al menos un símbolo (¡! @ # $ % &amp; *)</li>
+                  </ul>
+                </div>
+                <div class="half">
+                  <label class="field"><span>Tu ID de jugador de Free Fire</span>
+                    <input type="text" id="suFFId" inputmode="numeric" autocomplete="off" placeholder="Ej.: 5123456789" required />
+                    <small>Lo encuentras en tu perfil dentro del juego, bajo tu nick.</small>
+                  </label>
+                  <label class="field"><span>WhatsApp (opcional)</span>
+                    <input type="text" id="suWhats" inputmode="tel" autocomplete="tel" placeholder="Ej.: 987 654 321" />
+                  </label>
+                </div>
+                <div class="turnstile-wrap">
+                  <div class="cf-turnstile" data-sitekey="0x4AAAAAAF9OvuttQOhM5XrN" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired" data-error-callback="onTurnstileExpired"></div>
+                  <p class="fineprint">Completa el captcha de Cloudflare para confirmar que eres una persona real.</p>
+                </div>
+                <div class="form-error" id="signupError" role="alert"></div>
+                <div class="success-box" id="signupSuccess">
+                  <h3>Revisa tu correo</h3>
+                  <p style="margin:0;" id="signupSuccessText">Cuenta creada. Te enviamos un correo de verificación. Confírmalo desde tu bandeja (revisa también spam) y vuelve aquí para iniciar sesión.</p>
+                </div>
+                <button class="btn btn-accent" type="submit" id="signupBtn" style="width:100%;">Crear cuenta</button>
+                <p class="fineprint">Nunca compartas tu contraseña por WhatsApp: nadie del equipo te la va a pedir.</p>
+              </div>
+            </form>
+
+            <form id="loginForm" class="hidden" novalidate>
+              <div class="form-grid">
+                <label class="field"><span>Correo electrónico</span>
+                  <input type="email" id="liEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
+                </label>
+                <label class="field"><span>Contraseña</span>
+                  <input type="password" id="liPass" autocomplete="current-password" placeholder="Tu contraseña" required />
+                </label>
+                <div class="form-error" id="loginError" role="alert"></div>
+                <button class="btn btn-accent" type="submit" id="loginBtn" style="width:100%;">Iniciar sesión</button>
+                <p class="fineprint">Solo puedes entrar si ya confirmaste tu correo de verificación. Si no te llegó, revisa spam o espera unos minutos y vuelve a registrarte si la cuenta no se creó.</p>
+              </div>
+            </form>
+          </div>
+
+          <div id="authLoggedIn" class="hidden">
+            <p class="auth-user">Sesión iniciada como <b id="loggedUser">jugador</b><span class="verified-badge">Cuenta verificada</span></p>
+            <p class="fineprint" id="loggedMeta" style="margin-bottom:14px;"></p>
+            <button class="btn btn-plain btn-small" type="button" id="logoutBtn">Cerrar sesión</button>
+          </div>
+        </div>
+
+        <div class="form-card locked-box hidden" id="lockedBox" style="margin-bottom:18px;">
+          <h3>Inicia sesión para inscribirte</h3>
+          <p>Cuando tu cuenta esté verificada y hayas iniciado sesión, aquí abajo se habilita el formulario de la sala: eliges modo y dúo, y terminas en WhatsApp con el mensaje listo y tu captura del Yape.</p>
+        </div>
+
+        <div class="form-card hidden" id="formatSummary" style="margin-bottom:18px; background: var(--accent-soft); border-color: var(--accent);" aria-live="polite">
           <h3 id="summaryTitle" style="font-size:1.3rem; text-transform:uppercase; margin-bottom:8px;">Dúo · Modo Podio</h3>
           <table class="prize-table" style="max-width:420px;"><tbody id="summaryRows"></tbody></table>
           <p class="fineprint" id="summaryNote" style="margin-top:8px;"></p>
           <p class="fineprint" style="margin-top:6px;"><strong>Cómo sigue:</strong> completa tus datos aquí abajo y al final el botón abre WhatsApp con tu inscripción ya escrita; pagas por Yape a ese mismo número y envías la captura para confirmar tu cupo.</p>
         </div>
 
-        <form class="form-card" id="regForm" novalidate>
+        <form class="form-card hidden" id="regForm" novalidate>
           <div class="form-grid">
             <fieldset>
-              <legend>Tu perfil de jugador</legend>
+              <legend>Jugador que se inscribe</legend>
               <div class="form-grid">
-                <div class="half">
-                  <label class="field"><span>Correo electrónico</span>
-                    <input type="email" id="fEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
-                  </label>
-                  <label class="field"><span>Contraseña del perfil</span>
-                    <input type="password" id="fPass" autocomplete="new-password" placeholder="Crea una contraseña segura" required />
-                  </label>
-                </div>
-                <ul class="pw-rules" id="pwRules">
-                  <li data-rule="len">Mínimo 8 caracteres</li>
-                  <li data-rule="upper">Al menos una mayúscula</li>
-                  <li data-rule="num">Al menos un número</li>
-                  <li data-rule="sym">Al menos un símbolo (¡! @ # $ % &amp; *)</li>
-                </ul>
-                <p class="fineprint">La contraseña es solo para tu perfil de jugador en Torneos Tío LUX. Nunca la compartas por WhatsApp: nadie del equipo te la va a pedir.</p>
                 <div class="half">
                   <label class="field"><span>Nombre de jugador (nick en el juego)</span>
                     <input type="text" id="fNick" autocomplete="off" placeholder="Ej.: LUX・Sombra" required />
@@ -484,6 +570,7 @@
                     <small>Lo encuentras en tu perfil dentro del juego, bajo tu nick.</small>
                   </label>
                 </div>
+                <p class="fineprint">Estos datos salen de tu cuenta verificada. Si tu nick o tu ID cambiaron, corrígelos aquí antes de enviar: son los que van en el mensaje de WhatsApp.</p>
               </div>
             </fieldset>
 
@@ -711,13 +798,204 @@
           num: function (v) { return /[0-9]/.test(v); },
           sym: function (v) { return /[^A-Za-z0-9ÁÉÍÓÚÑáéíóúñ]/.test(v); }
         };
-        $("fPass").addEventListener("input", function () {
-          var v = $("fPass").value;
-          document.querySelectorAll("#pwRules li").forEach(function (li) {
+        $("suPass").addEventListener("input", function () {
+          var v = $("suPass").value;
+          document.querySelectorAll("#suPwRules li").forEach(function (li) {
             li.classList.toggle("ok", PW[li.getAttribute("data-rule")](v));
           });
         });
         function passwordOk(v) { return PW.len(v) && PW.upper(v) && PW.num(v) && PW.sym(v); }
+
+        /* ---------- Supabase: registro con verificación + Turnstile ---------- */
+        var SUPABASE_URL = "https://ngrvsypsquefrlaujiqh.supabase.co";
+        var SUPABASE_ANON_KEY = "sb_publishable_3SPz0xAyaoTdRjPrONB7Nw_XK_hDXSA";
+        var sb = null;
+        var currentUser = null;
+        var turnstileToken = null;
+        window.onTurnstileSuccess = function (token) { turnstileToken = token; };
+        window.onTurnstileExpired = function () { turnstileToken = null; };
+        try {
+          if (window.supabase && window.supabase.createClient) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch (err) { sb = null; }
+
+        function isVerified(user) { return !!(user && (user.email_confirmed_at || user.confirmed_at)); }
+        function authShowError(id, msg) {
+          var box = $(id);
+          if (!box) return;
+          box.textContent = msg;
+          box.classList.add("show");
+        }
+        function authHideError(id) { var box = $(id); if (box) box.classList.remove("show"); }
+        function friendlyAuthError(err, fallback) {
+          var m = (err && err.message ? err.message : "").toLowerCase();
+          if (m.indexOf("captcha") !== -1) return "El captcha no se pudo verificar. Complétalo de nuevo y vuelve a intentarlo.";
+          if (m.indexOf("email not confirmed") !== -1) return "Tu correo aún no está verificado. Revisa tu bandeja, confirma el correo de verificación y luego inicia sesión.";
+          if (m.indexOf("invalid login credentials") !== -1) return "Correo o contraseña incorrectos. Revisa tus datos e inténtalo de nuevo.";
+          if (m.indexOf("already registered") !== -1 || m.indexOf("already been registered") !== -1 || m.indexOf("user already") !== -1) return "Ya existe una cuenta con ese correo. Inicia sesión o, si aún no la confirmaste, revisa tu correo de verificación.";
+          if (m.indexOf("password") !== -1) return "La contraseña no cumple los requisitos de seguridad. Usa mínimo 8 caracteres, una mayúscula, un número y un símbolo.";
+          if (m.indexOf("rate") !== -1 || m.indexOf("too many") !== -1) return "Demasiados intentos seguidos. Espera unos minutos y vuelve a intentarlo.";
+          return fallback + (err && err.message ? " (" + err.message + ")" : "");
+        }
+        function resetTurnstile() {
+          turnstileToken = null;
+          try { if (window.turnstile) window.turnstile.reset(); } catch (e) {}
+        }
+        function refreshAuthUI() {
+          var loading = $("authLoading"), out = $("authLoggedOut"), inn = $("authLoggedIn");
+          var locked = $("lockedBox"), summary = $("formatSummary"), form = $("regForm");
+          if (!sb) {
+            loading.innerHTML = '<p class="fineprint" style="color:var(--danger);">No se pudo conectar con el servicio de cuentas en este momento. La página y los premios siguen visibles; vuelve a abrir esta vista en unos minutos para inscribirte.</p>';
+            out.classList.remove("hidden");
+            inn.classList.add("hidden");
+            locked.classList.remove("hidden");
+            summary.classList.add("hidden");
+            form.classList.add("hidden");
+            return;
+          }
+          loading.classList.add("hidden");
+          var verified = isVerified(currentUser);
+          if (currentUser && verified) {
+            out.classList.add("hidden");
+            inn.classList.remove("hidden");
+            locked.classList.add("hidden");
+            summary.classList.remove("hidden");
+            form.classList.remove("hidden");
+            var meta = currentUser.user_metadata || {};
+            var username = meta.username || meta.user_name || currentUser.email || "jugador";
+            $("loggedUser").textContent = username;
+            var parts = [];
+            if (currentUser.email) parts.push("Correo: " + currentUser.email);
+            if (meta.ff_id) parts.push("ID de Free Fire: " + meta.ff_id);
+            if (meta.whatsapp) parts.push("WhatsApp: " + meta.whatsapp);
+            $("loggedMeta").textContent = parts.join(" · ");
+            if (meta.username && !$("fNick").value) $("fNick").value = meta.username;
+            if (meta.ff_id && !$("fId").value) $("fId").value = meta.ff_id;
+            if (meta.username) $("fNick").value = meta.username;
+            if (meta.ff_id) $("fId").value = meta.ff_id;
+          } else {
+            if (currentUser && !verified) {
+              /* Sesión sin verificar: no habilita la inscripción */
+              try { sb.auth.signOut(); } catch (e) {}
+              currentUser = null;
+            }
+            out.classList.remove("hidden");
+            inn.classList.add("hidden");
+            locked.classList.remove("hidden");
+            summary.classList.add("hidden");
+            form.classList.add("hidden");
+          }
+        }
+        function setAuthTab(which) {
+          var isSignup = which === "signup";
+          $("tabSignup").classList.toggle("active", isSignup);
+          $("tabLogin").classList.toggle("active", !isSignup);
+          $("signupForm").classList.toggle("hidden", !isSignup);
+          $("loginForm").classList.toggle("hidden", isSignup);
+        }
+        $("tabSignup").addEventListener("click", function () { setAuthTab("signup"); });
+        $("tabLogin").addEventListener("click", function () { setAuthTab("login"); });
+
+        if (sb) {
+          sb.auth.getSession().then(function (res) {
+            var session = res && res.data ? res.data.session : null;
+            currentUser = session ? session.user : null;
+            refreshAuthUI();
+          }).catch(function () { currentUser = null; refreshAuthUI(); });
+          sb.auth.onAuthStateChange(function (_event, session) {
+            currentUser = session ? session.user : null;
+            refreshAuthUI();
+          });
+        } else {
+          refreshAuthUI();
+        }
+
+        $("signupForm").addEventListener("submit", function (e) {
+          e.preventDefault();
+          authHideError("signupError");
+          $("signupSuccess").classList.remove("show");
+          if (!sb) return authShowError("signupError", "No se pudo conectar con el servicio de cuentas. Inténtalo de nuevo en unos minutos.");
+          var username = $("suUser").value.trim();
+          var email = $("suEmail").value.trim();
+          var pass = $("suPass").value;
+          var ffId = $("suFFId").value.trim();
+          var whats = $("suWhats").value.trim();
+          if (username.length < 3) return authShowError("signupError", "Escribe un usuario de al menos 3 caracteres.");
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return authShowError("signupError", "Escribe un correo válido: ahí te llega la verificación.");
+          if (!passwordOk(pass)) return authShowError("signupError", "Tu contraseña aún no cumple la política de seguridad: mínimo 8 caracteres, una mayúscula, un número y un símbolo.");
+          if (!/^\d{5,}$/.test(ffId)) return authShowError("signupError", "Revisa tu ID de Free Fire: son solo números (mínimo 5).");
+          if (whats && !/^[+\d][\d\s-]{7,}$/.test(whats)) return authShowError("signupError", "Revisa tu WhatsApp o deja ese campo vacío: es opcional.");
+          if (!turnstileToken) return authShowError("signupError", "Completa el captcha para confirmar que eres una persona real.");
+          var btn = $("signupBtn");
+          btn.disabled = true;
+          btn.textContent = "Creando cuenta…";
+          sb.auth.signUp({
+            email: email,
+            password: pass,
+            options: {
+              data: { username: username, ff_id: ffId, whatsapp: whats },
+              captchaToken: turnstileToken
+            }
+          }).then(function (res) {
+            btn.disabled = false;
+            btn.textContent = "Crear cuenta";
+            resetTurnstile();
+            if (res.error) return authShowError("signupError", friendlyAuthError(res.error, "No se pudo crear la cuenta."));
+            var identities = res.data && res.data.user ? res.data.user.identities : null;
+            if (identities && identities.length === 0) {
+              return authShowError("signupError", "Ya existe una cuenta con ese correo. Inicia sesión o revisa tu correo de verificación si aún no la confirmaste.");
+            }
+            $("signupSuccessText").textContent = "Cuenta creada para " + email + ". Te enviamos un correo de verificación: confírmalo desde tu bandeja (revisa también spam) y vuelve aquí para iniciar sesión. Recién con la cuenta verificada podrás inscribirte a una sala.";
+            $("signupSuccess").classList.add("show");
+            $("signupSuccess").scrollIntoView({ behavior: "smooth", block: "center" });
+            $("liEmail").value = email;
+          }).catch(function (err) {
+            btn.disabled = false;
+            btn.textContent = "Crear cuenta";
+            resetTurnstile();
+            authShowError("signupError", friendlyAuthError(err, "No se pudo crear la cuenta."));
+          });
+        });
+
+        $("loginForm").addEventListener("submit", function (e) {
+          e.preventDefault();
+          authHideError("loginError");
+          if (!sb) return authShowError("loginError", "No se pudo conectar con el servicio de cuentas. Inténtalo de nuevo en unos minutos.");
+          var email = $("liEmail").value.trim();
+          var pass = $("liPass").value;
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return authShowError("loginError", "Escribe un correo válido.");
+          if (!pass) return authShowError("loginError", "Escribe tu contraseña.");
+          var btn = $("loginBtn");
+          btn.disabled = true;
+          btn.textContent = "Ingresando…";
+          sb.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
+            btn.disabled = false;
+            btn.textContent = "Iniciar sesión";
+            if (res.error) return authShowError("loginError", friendlyAuthError(res.error, "No se pudo iniciar sesión."));
+            var user = res.data ? res.data.user : null;
+            if (user && !isVerified(user)) {
+              sb.auth.signOut();
+              currentUser = null;
+              refreshAuthUI();
+              return authShowError("loginError", "Tu correo aún no está verificado. Confirma el correo de verificación y luego inicia sesión.");
+            }
+            currentUser = user;
+            refreshAuthUI();
+            $("formatSummary").scrollIntoView({ behavior: "smooth", block: "start" });
+          }).catch(function (err) {
+            btn.disabled = false;
+            btn.textContent = "Iniciar sesión";
+            authShowError("loginError", friendlyAuthError(err, "No se pudo iniciar sesión."));
+          });
+        });
+
+        $("logoutBtn").addEventListener("click", function () {
+          if (!sb) return;
+          sb.auth.signOut().then(function () {
+            currentUser = null;
+            refreshAuthUI();
+            window.scrollTo(0, 0);
+          });
+        });
 
         /* ---------- Contador de cupos ---------- */
         function approvedPlayers() {
@@ -745,8 +1023,11 @@
         $("regForm").addEventListener("submit", function (e) {
           e.preventDefault();
           hideError();
-          var email = $("fEmail").value.trim();
-          var pass = $("fPass").value;
+          if (!currentUser || !isVerified(currentUser)) {
+            $("authCard").scrollIntoView({ behavior: "smooth", block: "start" });
+            return showError("Inicia sesión con una cuenta verificada para inscribirte. Primero crea tu cuenta, confirma tu correo y luego inicia sesión.");
+          }
+          var email = currentUser.email || "";
           var nick = $("fNick").value.trim();
           var gid = $("fId").value.trim();
           var modo = $("fModo").value;
@@ -755,8 +1036,6 @@
           var duoNick = $("fDuoNick").value.trim();
           var duoId = $("fDuoId").value.trim();
 
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return showError("Escribe un correo válido: lo usamos para identificar tu perfil de jugador.");
-          if (!passwordOk(pass)) return showError("Tu contraseña aún no cumple la política de seguridad: mínimo 8 caracteres, una mayúscula, un número y un símbolo.");
           if (!nick) return showError("Falta tu nombre de jugador (tu nick en Free Fire).");
           if (!/^\d{5,}$/.test(gid)) return showError("Revisa tu ID de jugador: son solo números (mínimo 5). Está en tu perfil dentro del juego.");
           if (modo === "duo" && choice === "tengo") {
