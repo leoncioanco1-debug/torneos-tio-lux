@@ -1203,6 +1203,39 @@
           var msg = lines.join("\n");
           var url = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(msg);
 
+          /* Guardar la inscripción en Supabase (public.inscriptions) como
+             pendiente, con la misma clave anon de las cuentas. Es de mejor
+             esfuerzo: si falla (sin conexión, tabla aún no creada, etc.),
+             igual se abre WhatsApp para no bloquear al jugador. Se lanza
+             sin esperar para que el navegador no bloquee la ventana de
+             WhatsApp por perder el gesto del toque. */
+          try {
+            if (sb) {
+              var meta = currentUser.user_metadata || {};
+              var inscriptionPayload = {
+                sala: NEXT_ROOM.title,
+                fecha: NEXT_ROOM.dateText,
+                hora: NEXT_ROOM.timeText,
+                modo: MODO_NAMES[modo],
+                formato: FORMATO_NAMES[formato],
+                correo: email,
+                usuario: nick,
+                ff_id: gid,
+                whatsapp: meta.whatsapp || null,
+                cantidad_jugadores: n,
+                total: total,
+                estado: "pendiente"
+              };
+              Promise.resolve(sb.from("inscriptions").insert(inscriptionPayload)).then(function (res) {
+                if (res && res.error) console.warn("No se pudo guardar la inscripción en Supabase:", res.error.message || res.error);
+              }).catch(function (err) {
+                console.warn("No se pudo guardar la inscripción en Supabase:", err);
+              });
+            }
+          } catch (saveErr) {
+            console.warn("No se pudo guardar la inscripción en Supabase:", saveErr);
+          }
+
           state.regs.push({
             id: ++seq, nick: nick, gameId: gid, modo: MODO_NAMES[modo],
             formato: FORMATO_NAMES[formato], players: n, status: "pendiente",
