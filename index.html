@@ -296,6 +296,9 @@
       .form-error { display: none; background: #fdecea; color: #7a1710; border: 1px solid #e5a49e; border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; }
       @media (prefers-color-scheme: dark) { .form-error { background: #3a1713; color: #ffb4ab; border-color: #6e2a24; } }
       .form-error.show { display: block; }
+      .save-warning { display: none; background: #fdf3e0; color: #7a4a00; border: 1px solid #d9a441; border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; font-weight: 600; }
+      @media (prefers-color-scheme: dark) { .save-warning { background: #33270d; color: #ffd88a; border-color: #8a6a1f; } }
+      .save-warning.show { display: block; }
       .success-box { display: none; border: 1px solid var(--ok); border-radius: 12px; padding: 18px; background: var(--surface-2); }
       .success-box.show { display: block; }
       .success-box h3 { color: var(--ok); font-size: 1.3rem; text-transform: uppercase; margin-bottom: 6px; }
@@ -656,6 +659,8 @@
               Inscribirme por WhatsApp
             </button>
             <p class="fineprint">Al tocar el botón se abre WhatsApp con tu inscripción escrita. El pago es por Yape al mismo número y tu cupo se confirma cuando envíes la captura. Nada se cobra dentro de esta página.</p>
+
+            <div class="save-warning" id="saveWarning" role="alert">No se pudo guardar tu inscripción, avísale al Tío LUX por WhatsApp</div>
 
             <div class="success-box" id="successBox">
               <h3>¡Inscripción enviada!</h3>
@@ -1204,52 +1209,73 @@
           var url = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(msg);
 
           /* Guardar la inscripción en Supabase (public.inscriptions) como
-             pendiente, con la misma clave anon de las cuentas. Es de mejor
-             esfuerzo: si falla (sin conexión, tabla aún no creada, etc.),
-             igual se abre WhatsApp para no bloquear al jugador. Se lanza
-             sin esperar para que el navegador no bloquee la ventana de
-             WhatsApp por perder el gesto del toque. */
-          try {
-            if (sb) {
-              var meta = currentUser.user_metadata || {};
-              var inscriptionPayload = {
-                sala: NEXT_ROOM.title,
-                fecha: NEXT_ROOM.dateText,
-                hora: NEXT_ROOM.timeText,
-                modo: MODO_NAMES[modo],
-                formato: FORMATO_NAMES[formato],
-                correo: email,
-                usuario: nick,
-                ff_id: gid,
-                whatsapp: meta.whatsapp || null,
-                cantidad_jugadores: n,
-                total: total,
-                estado: "pendiente"
-              };
-              Promise.resolve(sb.from("inscriptions").insert(inscriptionPayload)).then(function (res) {
-                if (res && res.error) console.warn("No se pudo guardar la inscripción en Supabase:", res.error.message || res.error);
-              }).catch(function (err) {
-                console.warn("No se pudo guardar la inscripción en Supabase:", err);
-              });
-            }
-          } catch (saveErr) {
-            console.warn("No se pudo guardar la inscripción en Supabase:", saveErr);
+             pendiente, con la misma clave anon de las cuentas. Ahora se
+             ESPERA a que el guardado termine (máximo ~3 segundos) ANTES de
+             abrir WhatsApp, para que la inscripción quede registrada en el
+             panel del organizador. Si el guardado falla o se agota el
+             tiempo, igual se abre WhatsApp como siempre, pero se muestra
+             un aviso visible en la página para que nunca falle en silencio. */
+          var inscriptionMeta = currentUser.user_metadata || {};
+          var inscriptionPayload = {
+            sala: NEXT_ROOM.title,
+            fecha: NEXT_ROOM.dateText,
+            hora: NEXT_ROOM.timeText,
+            modo: MODO_NAMES[modo],
+            formato: FORMATO_NAMES[formato],
+            correo: email,
+            usuario: nick,
+            ff_id: gid,
+            whatsapp: inscriptionMeta.whatsapp || null,
+            cantidad_jugadores: n,
+            total: total,
+            estado: "pendiente"
+          };
+          var submitBtn = $("regForm").querySelector('button[type="submit"]');
+          if (submitBtn) submitBtn.disabled = true;
+          $("saveWarning").classList.remove("show");
+
+          function finishInscription(saved) {
+            if (submitBtn) submitBtn.disabled = false;
+            if (!saved) $("saveWarning").classList.add("show");
+
+            state.regs.push({
+              id: ++seq, nick: nick, gameId: gid, modo: MODO_NAMES[modo],
+              formato: FORMATO_NAMES[formato], players: n, status: "pendiente",
+              extra: modo === "duo" && choice === "tengo" ? "Dúo: " + duoNick + " (ID: " + duoId + ")"
+                : modo === "duo" ? "Dúo aleatorio"
+                : modo === "escuadra" ? (choice === "completa" ? "Escuadra completa" : "Escuadra aleatoria") : ""
+            });
+            renderAll();
+
+            $("successMsg").textContent = msg;
+            $("successWa").href = url;
+            $("successBox").classList.add("show");
+            window.open(url, "_blank", "noopener");
+            (saved ? $("successBox") : $("saveWarning")).scrollIntoView({ behavior: "smooth", block: "center" });
           }
 
-          state.regs.push({
-            id: ++seq, nick: nick, gameId: gid, modo: MODO_NAMES[modo],
-            formato: FORMATO_NAMES[formato], players: n, status: "pendiente",
-            extra: modo === "duo" && choice === "tengo" ? "Dúo: " + duoNick + " (ID: " + duoId + ")"
-              : modo === "duo" ? "Dúo aleatorio"
-              : modo === "escuadra" ? (choice === "completa" ? "Escuadra completa" : "Escuadra aleatoria") : ""
+          var saveAttempt;
+          if (!sb) {
+            saveAttempt = Promise.resolve(false);
+          } else {
+            saveAttempt = Promise.resolve()
+              .then(function () { return sb.from("inscriptions").insert(inscriptionPayload); })
+              .then(function (res) {
+                if (res && res.error) {
+                  console.warn("No se pudo guardar la inscripción en Supabase:", res.error.message || res.error);
+                  return false;
+                }
+                return true;
+              })
+              .catch(function (err) {
+                console.warn("No se pudo guardar la inscripción en Supabase:", err);
+                return false;
+              });
+          }
+          var saveTimeout = new Promise(function (resolve) {
+            setTimeout(function () { resolve(false); }, 3000);
           });
-          renderAll();
-
-          $("successMsg").textContent = msg;
-          $("successWa").href = url;
-          $("successBox").classList.add("show");
-          window.open(url, "_blank", "noopener");
-          $("successBox").scrollIntoView({ behavior: "smooth", block: "center" });
+          Promise.race([saveAttempt, saveTimeout]).then(finishInscription);
         });
 
         /* ---------- Vistas separadas: pública e inscripción ----------
