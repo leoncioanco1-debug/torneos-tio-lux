@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
     <style>
       :root {
         --bg: #f4f1ea;
@@ -509,7 +509,7 @@
                   </label>
                 </div>
                 <div class="turnstile-wrap">
-                  <div class="cf-turnstile" data-sitekey="0x4AAAAAAF9OvuttQOhM5XrN" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired" data-error-callback="onTurnstileExpired"></div>
+                  <div id="signupTurnstile" class="cf-turnstile" data-sitekey="0x4AAAAAAF9OvuttQOhM5XrN"></div>
                   <p class="fineprint">Completa el captcha de Cloudflare para confirmar que eres una persona real.</p>
                 </div>
                 <div class="form-error" id="signupError" role="alert"></div>
@@ -531,7 +531,7 @@
                   <input type="password" id="liPass" autocomplete="current-password" placeholder="Tu contraseña" required />
                 </label>
                 <div class="turnstile-wrap">
-                  <div class="cf-turnstile" data-sitekey="0x4AAAAAAF9OvuttQOhM5XrN" data-callback="onLoginTurnstileSuccess" data-expired-callback="onLoginTurnstileExpired" data-error-callback="onLoginTurnstileExpired"></div>
+                  <div id="loginTurnstile" class="cf-turnstile" data-sitekey="0x4AAAAAAF9OvuttQOhM5XrN"></div>
                   <p class="fineprint">Completa el captcha de Cloudflare para confirmar que eres una persona real.</p>
                 </div>
                 <div class="form-error" id="loginError" role="alert"></div>
@@ -816,8 +816,68 @@
         var sb = null;
         var currentUser = null;
         var turnstileToken = null;
+        var loginTurnstileToken = null;
+        var signupWidgetId = null;
+        var loginWidgetId = null;
+        var TURNSTILE_SITEKEY = "0x4AAAAAAF9OvuttQOhM5XrN";
         window.onTurnstileSuccess = function (token) { turnstileToken = token; };
         window.onTurnstileExpired = function () { turnstileToken = null; };
+        window.onLoginTurnstileSuccess = function (token) { loginTurnstileToken = token; };
+        window.onLoginTurnstileExpired = function () { loginTurnstileToken = null; };
+        function turnstileReady() {
+          return !!(window.turnstile && typeof window.turnstile.render === "function");
+        }
+        function renderSignupTurnstile() {
+          if (signupWidgetId !== null || !turnstileReady()) return;
+          var el = document.getElementById("signupTurnstile");
+          if (!el) return;
+          var sForm = $("signupForm");
+          if (sForm && sForm.classList.contains("hidden")) return;
+          var view = $("registerView");
+          if (view && view.classList.contains("hidden")) return;
+          try {
+            signupWidgetId = window.turnstile.render(el, {
+              sitekey: TURNSTILE_SITEKEY,
+              callback: function (token) { turnstileToken = token; },
+              "expired-callback": function () { turnstileToken = null; },
+              "error-callback": function () { turnstileToken = null; }
+            });
+          } catch (e) { signupWidgetId = null; }
+        }
+        function renderLoginTurnstile() {
+          if (loginWidgetId !== null || !turnstileReady()) return;
+          var el = document.getElementById("loginTurnstile");
+          if (!el) return;
+          /* No renderizar mientras el formulario está oculto: un widget
+             creado con display:none queda con tamaño 0 y nunca se ve.
+             Solo se crea cuando la pestaña de inicio de sesión es visible. */
+          var form = $("loginForm");
+          if (form && form.classList.contains("hidden")) return;
+          var view = $("registerView");
+          if (view && view.classList.contains("hidden")) return;
+          try {
+            loginWidgetId = window.turnstile.render(el, {
+              sitekey: TURNSTILE_SITEKEY,
+              callback: function (token) { loginTurnstileToken = token; },
+              "expired-callback": function () { loginTurnstileToken = null; },
+              "error-callback": function () { loginTurnstileToken = null; }
+            });
+          } catch (e) { loginWidgetId = null; }
+        }
+        function renderVisibleTurnstiles() {
+          renderSignupTurnstile();
+          renderLoginTurnstile();
+        }
+        /* La API de Turnstile carga con async/defer: puede no estar lista
+           cuando este script corre. Se reintenta hasta que aparezca. */
+        var turnstilePollCount = 0;
+        var turnstilePoll = setInterval(function () {
+          turnstilePollCount++;
+          renderVisibleTurnstiles();
+          if ((signupWidgetId !== null && loginWidgetId !== null) || turnstilePollCount > 100) {
+            clearInterval(turnstilePoll);
+          }
+        }, 300);
         try {
           if (window.supabase && window.supabase.createClient) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         } catch (err) { sb = null; }
@@ -842,34 +902,37 @@
         }
         function resetTurnstile() {
           turnstileToken = null;
-          try { if (window.turnstile) window.turnstile.reset(); } catch (e) {}
+          if (!window.turnstile) return;
+          try {
+            if (signupWidgetId !== null) window.turnstile.reset(signupWidgetId);
+            else if (typeof window.turnstile.reset === "function") window.turnstile.reset();
+          } catch (e) {}
         }
-        /* ---------- Turnstile propio del inicio de sesión ----------
-           El token del registro queda consumido al crear la cuenta, así que el
-           login usa su propio widget declarativo (el mismo mecanismo del
-           registro: div .cf-turnstile con la site key en el formulario) y su
-           propio token, independiente. */
-        var loginTurnstileToken = null;
-        window.onLoginTurnstileSuccess = function (token) { loginTurnstileToken = token; };
-        window.onLoginTurnstileExpired = function () { loginTurnstileToken = null; };
         function loginTurnstileEl() {
-          var form = $("loginForm");
-          return form ? form.querySelector(".cf-turnstile") : null;
+          return document.getElementById("loginTurnstile");
         }
         function getLoginTurnstileToken() {
           if (loginTurnstileToken) return loginTurnstileToken;
-          var el = loginTurnstileEl();
-          if (el && window.turnstile && typeof window.turnstile.getResponse === "function") {
-            try { loginTurnstileToken = window.turnstile.getResponse(el) || null; } catch (e) {}
+          if (window.turnstile && typeof window.turnstile.getResponse === "function") {
+            try {
+              if (loginWidgetId !== null) loginTurnstileToken = window.turnstile.getResponse(loginWidgetId) || null;
+            } catch (e) {}
           }
           return loginTurnstileToken;
         }
+        function getSignupTurnstileToken() {
+          if (turnstileToken) return turnstileToken;
+          if (window.turnstile && typeof window.turnstile.getResponse === "function" && signupWidgetId !== null) {
+            try { turnstileToken = window.turnstile.getResponse(signupWidgetId) || null; } catch (e) {}
+          }
+          return turnstileToken;
+        }
         function resetLoginTurnstile() {
           loginTurnstileToken = null;
-          var el = loginTurnstileEl();
-          if (el && window.turnstile) {
-            try { window.turnstile.reset(el); } catch (e) {}
-          }
+          if (!window.turnstile) return;
+          try {
+            if (loginWidgetId !== null) window.turnstile.reset(loginWidgetId);
+          } catch (e) {}
         }
         function refreshAuthUI() {
           var loading = $("authLoading"), out = $("authLoggedOut"), inn = $("authLoggedIn");
@@ -922,6 +985,14 @@
           $("tabLogin").classList.toggle("active", !isSignup);
           $("signupForm").classList.toggle("hidden", !isSignup);
           $("loginForm").classList.toggle("hidden", isSignup);
+          /* Renderizar el captcha recién ahora que su formulario es visible */
+          if (isSignup) {
+            renderSignupTurnstile();
+          } else {
+            /* Pequeña espera para que el navegador quite el display:none */
+            setTimeout(renderLoginTurnstile, 0);
+            setTimeout(renderLoginTurnstile, 250);
+          }
         }
         $("tabSignup").addEventListener("click", function () { setAuthTab("signup"); });
         $("tabLogin").addEventListener("click", function () { setAuthTab("login"); });
@@ -955,7 +1026,7 @@
           if (!passwordOk(pass)) return authShowError("signupError", "Tu contraseña aún no cumple la política de seguridad: mínimo 8 caracteres, una mayúscula, un número y un símbolo.");
           if (!/^\d{5,}$/.test(ffId)) return authShowError("signupError", "Revisa tu ID de Free Fire: son solo números (mínimo 5).");
           if (whats && !/^[+\d][\d\s-]{7,}$/.test(whats)) return authShowError("signupError", "Revisa tu WhatsApp o deja ese campo vacío: es opcional.");
-          if (!turnstileToken) return authShowError("signupError", "Completa el captcha para confirmar que eres una persona real.");
+          if (!getSignupTurnstileToken()) return authShowError("signupError", "Completa el captcha para confirmar que eres una persona real.");
           var btn = $("signupBtn");
           btn.disabled = true;
           btn.textContent = "Creando cuenta…";
@@ -964,7 +1035,7 @@
             password: pass,
             options: {
               data: { username: username, ff_id: ffId, whatsapp: whats },
-              captchaToken: turnstileToken
+              captchaToken: getSignupTurnstileToken()
             }
           }).then(function (res) {
             btn.disabled = false;
@@ -1138,6 +1209,13 @@
           $("registerView").classList.toggle("hidden", view !== "register");
           document.title = view === "register" ? REG_TITLE : PUBLIC_TITLE;
           if (view !== currentView) { window.scrollTo(0, 0); currentView = view; }
+          if (view === "register") {
+            /* La vista acaba de hacerse visible: es el momento seguro para
+               crear los captchas (antes estaban en un contenedor oculto). */
+            setTimeout(renderVisibleTurnstiles, 0);
+            setTimeout(renderVisibleTurnstiles, 300);
+            setTimeout(renderVisibleTurnstiles, 900);
+          }
         }
         window.addEventListener("hashchange", applyRoute);
 
