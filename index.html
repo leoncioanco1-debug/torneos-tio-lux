@@ -295,75 +295,15 @@
       }
       .fineprint { font-size: 0.87rem; color: var(--muted); margin: 0; }
 
-      /* ---------- Admin ---------- */
-      .admin-gate { text-align: center; padding: 10px 0 4px; }
-      .admin-panel { display: none; }
-      .admin-panel.open { display: block; }
-      .admin-stats { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); margin-bottom: 18px; }
-      @media (min-width: 860px) { .admin-stats { grid-template-columns: repeat(4, 1fr); } }
-      .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-      .stat b { font-family: "Rajdhani", sans-serif; font-size: 1.7rem; display: block; line-height: 1.05; color: var(--accent-strong); }
-      .stat span { font-size: 0.85rem; color: var(--muted); }
-      .admin-block { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 18px; box-shadow: var(--shadow); }
-      .admin-block h3 { font-size: 1.3rem; text-transform: uppercase; margin-bottom: 12px; }
-      .reg-list { display: grid; gap: 10px; }
-      .reg-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--bg); display: grid; gap: 8px; }
-      @media (min-width: 760px) { .reg-item { grid-template-columns: 1fr auto; align-items: center; } }
-      .reg-item .who b { font-size: 1.02rem; }
-      .reg-item .meta { font-size: 0.88rem; color: var(--muted); }
-      .badge { display: inline-block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; border-radius: 99px; padding: 2px 9px; margin-left: 6px; vertical-align: 2px; }
-      .badge-pend { background: #fdf0d5; color: #7a5200; }
-      .badge-apr { background: #dff5e6; color: #0d5c33; }
-      .badge-rej { background: #fde3e0; color: #8c1d18; }
-      @media (prefers-color-scheme: dark) {
-        .badge-pend { background: #3d2f08; color: #ffd97a; }
-        .badge-apr { background: #0f3520; color: #7fe6ab; }
-        .badge-rej { background: #3d1713; color: #ff9d94; }
-      }
-      .reg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-      .mini-btn {
-        min-height: 40px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
-        font: inherit; font-weight: 600; font-size: 0.9rem;
-        border: 1px solid var(--line); background: var(--surface);
-      }
-      .mini-btn.approve { background: var(--ok); border-color: var(--ok); color: #fff; }
-      @media (prefers-color-scheme: dark) { .mini-btn.approve { color: #052e16; } }
-      .mini-btn.reject { color: var(--danger); }
-      .mini-btn:hover { filter: brightness(1.07); }
-      .admin-form { display: grid; gap: 12px; }
-      @media (min-width: 760px) { .admin-form { grid-template-columns: repeat(3, 1fr); align-items: end; } .admin-form .wide { grid-column: span 2; } }
-      .margin-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-      .margin-table th, .margin-table td { text-align: left; padding: 8px 6px; border-bottom: 1px dashed var(--line); }
-      .margin-table td:last-child, .margin-table th:last-child { text-align: right; }
-      .margin-table tr:last-child td { border-bottom: none; }
-      .gain { font-weight: 800; color: var(--ok); font-family: "Rajdhani", sans-serif; font-size: 1.1rem; }
-
-      /* ---------- Vista separada del organizador ---------- */
-      .admin-view { min-height: 100vh; background: var(--bg); }
-      .admin-topbar {
+      /* ---------- Vista separada de inscripción ---------- */
+      .sub-view { min-height: 100vh; background: var(--bg); }
+      .sub-topbar {
         display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
         padding: 18px 0 6px;
       }
-      .admin-topbar .a-brand { font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 1.35rem; text-transform: uppercase; }
-      .admin-topbar .a-brand span { color: var(--accent-strong); }
-      .admin-topbar .a-tag { font-size: 0.85rem; color: var(--muted); display: block; font-family: "Archivo", sans-serif; font-weight: 400; text-transform: none; letter-spacing: 0; }
-      .login-wrap { max-width: 460px; margin: 0 auto; padding: 28px 0 56px; }
-      .login-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 26px 24px; }
-      .login-card h2 { font-size: 1.65rem; text-transform: uppercase; margin-bottom: 6px; }
-      .login-card p.lead { color: var(--muted); margin: 0 0 18px; font-size: 0.95rem; }
-      .login-card form { display: grid; gap: 14px; }
-      .auth-error { display: none; background: #fdecea; color: #7a1710; border: 1px solid #e5a49e; border-radius: 10px; padding: 11px 14px; font-size: 0.93rem; }
-      @media (prefers-color-scheme: dark) { .auth-error { background: #3a1713; color: #ffb4ab; border-color: #6e2a24; } }
-      .auth-error.show { display: block; }
-      .auth-switch { margin-top: 14px; font-size: 0.9rem; color: var(--muted); text-align: center; }
-      .auth-switch button { background: none; border: none; padding: 6px; font: inherit; font-weight: 700; color: var(--accent-strong); cursor: pointer; text-decoration: underline; }
-      .admin-head-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-      .admin-head-row h2 { font-size: clamp(1.7rem, 4.5vw, 2.3rem); text-transform: uppercase; }
-      .admin-head-row p { color: var(--muted); margin: 6px 0 0; max-width: 560px; }
-      .admin-session { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-      .admin-session .who-logged { font-size: 0.9rem; color: var(--muted); }
-      .admin-session .who-logged b { color: var(--ink); }
-
+      .sub-topbar .a-brand { font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 1.35rem; text-transform: uppercase; }
+      .sub-topbar .a-brand span { color: var(--accent-strong); }
+      .sub-topbar .a-tag { font-size: 0.85rem; color: var(--muted); display: block; font-family: "Archivo", sans-serif; font-weight: 400; text-transform: none; letter-spacing: 0; }
       footer { margin-top: 64px; border-top: 1px solid var(--line); background: var(--bg-2); }
       footer .wrap { padding-top: 28px; padding-bottom: 36px; display: grid; gap: 14px; }
       footer .f-brand { font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 1.4rem; text-transform: uppercase; }
@@ -485,12 +425,6 @@
           <a href="#modos">Modos y premios</a>
           <a href="#inscripcion">Inscribirme</a>
         </div>
-        <div style="background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; max-width: 640px;">
-          <p style="color: var(--ink); font-weight: 700; margin-bottom: 6px;">¿Eres el organizador (Tío LUX)? Aquí está tu panel</p>
-          <p style="margin-bottom: 10px;">El panel no está en el menú de los jugadores: es una página aparte. Entra tocando el botón de abajo o agregando <strong>#organizador</strong> al final de la dirección de esta página. La primera vez creas tu correo y tu contraseña, y ahí apruebas inscripciones y llevas las cuentas.</p>
-          <p style="margin-bottom: 12px;">Ojo, con honestidad: esta página es estática, así que ese acceso vale solo durante la sesión en que lo abres y lo que apruebes aquí no se guarda al cerrar. La confirmación que vale es la de siempre: la inscripción y la captura del pago que te llegan por WhatsApp.</p>
-          <a class="btn btn-accent btn-small" href="#organizador">Ir a mi panel de organizador</a>
-        </div>
         <p>Free Fire es una marca de Garena. Esta página es de un organizador independiente y no está afiliada a Garena.</p>
       </div>
     </footer>
@@ -500,9 +434,9 @@
     <!-- ================= VISTA DE INSCRIPCIÓN (página aparte) =================
          No es parte del recorrido público: solo se muestra cuando la dirección
          termina en #inscripcion, al tocar "Inscribirme ahora" o "Elegir modo". -->
-    <div id="registerView" class="admin-view hidden">
+    <div id="registerView" class="sub-view hidden">
       <div class="wrap">
-        <div class="admin-topbar">
+        <div class="sub-topbar">
           <div class="a-brand">Torneos <span>Tío LUX</span>
             <span class="a-tag">Inscripción a la próxima sala</span>
           </div>
@@ -634,165 +568,6 @@
     </div><!-- /registerView -->
 
 
-
-    <!-- ================= PÁGINA DEL ORGANIZADOR (vista separada) =================
-         No forma parte de la página pública: solo se muestra cuando la dirección
-         termina en #organizador. Sin ese enlace, ningún visitante la ve. -->
-    <div id="adminView" class="admin-view hidden">
-      <div class="wrap">
-        <div class="admin-topbar">
-          <div class="a-brand">Torneos <span>Tío LUX</span>
-            <span class="a-tag">Página del organizador · acceso solo para ti</span>
-          </div>
-          <a class="btn btn-plain btn-small" href="#" id="backToPublicTop">Ver página pública</a>
-        </div>
-
-        <!-- Crear acceso (primera vez en esta sesión) -->
-        <div class="login-wrap" id="authSetup">
-          <div class="login-card">
-            <h2>Crea tu acceso</h2>
-            <p class="lead">Es tu primera vez en esta página en esta sesión: define el correo y la contraseña con los que vas a entrar. Solo quien tenga esos dos datos puede abrir tu panel.</p>
-            <form id="setupForm" novalidate>
-              <label class="field"><span>Tu correo</span>
-                <input type="email" id="sEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
-              </label>
-              <label class="field"><span>Crea tu contraseña</span>
-                <input type="password" id="sPass" autocomplete="new-password" placeholder="Contraseña del organizador" required />
-              </label>
-              <ul class="pw-rules" id="setupPwRules">
-                <li data-rule="len">Mínimo 8 caracteres</li>
-                <li data-rule="upper">Al menos una mayúscula</li>
-                <li data-rule="num">Al menos un número</li>
-                <li data-rule="sym">Al menos un símbolo (¡! @ # $ % &amp; *)</li>
-              </ul>
-              <label class="field"><span>Repite tu contraseña</span>
-                <input type="password" id="sPass2" autocomplete="new-password" placeholder="La misma contraseña" required />
-              </label>
-              <div class="auth-error" id="setupError" role="alert"></div>
-              <button class="btn btn-accent" type="submit" style="width:100%;">Crear acceso y entrar</button>
-            </form>
-            <p class="fineprint" style="margin-top:12px;">Guarda bien tu contraseña: es la única llave de esta página durante la sesión.</p>
-          </div>
-        </div>
-
-        <!-- Ingreso -->
-        <div class="login-wrap hidden" id="authLogin">
-          <div class="login-card">
-            <h2>Ingresa a tu panel</h2>
-            <p class="lead">Escribe el correo y la contraseña que definiste para el organizador. Nadie más puede entrar.</p>
-            <form id="loginForm" novalidate>
-              <label class="field"><span>Correo</span>
-                <input type="email" id="lEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
-              </label>
-              <label class="field"><span>Contraseña</span>
-                <input type="password" id="lPass" autocomplete="current-password" placeholder="Tu contraseña" required />
-              </label>
-              <div class="auth-error" id="loginError" role="alert"></div>
-              <button class="btn btn-accent" type="submit" style="width:100%;">Entrar al panel</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- Panel (solo tras ingresar) -->
-        <div class="admin-panel" id="adminPanel" style="padding-bottom:56px;">
-          <div class="admin-head-row">
-            <div>
-              <h2>Panel del organizador</h2>
-              <p>Aquí revisas las inscripciones que llegan, apruebas los pagos confirmados y publicas ganadores y premios.</p>
-            </div>
-            <div class="admin-session">
-              <span class="who-logged">Sesión de <b id="sessionEmail"></b></span>
-              <button class="btn btn-plain btn-small" type="button" id="logoutAdmin">Cerrar sesión</button>
-            </div>
-          </div>
-
-          <div class="admin-stats">
-            <div class="stat"><b id="stAprobados">0</b><span>jugadores con cupo confirmado</span></div>
-            <div class="stat"><b id="stPendientes">0</b><span>inscripciones por revisar</span></div>
-            <div class="stat"><b id="stPozo">S/0</b><span>pozo de inscripciones confirmadas</span></div>
-            <div class="stat"><b id="stLibres">48</b><span>cupos libres de la sala</span></div>
-          </div>
-
-          <div class="admin-block">
-            <h3>Inscripciones recibidas</h3>
-            <p class="fineprint" id="regEmpty">Todavía no llega ninguna inscripción en esta sesión. Cuando un jugador se inscriba desde el formulario, o agregues una que llegó por WhatsApp, aparecerá aquí para aprobarla o rechazarla.</p>
-            <div class="reg-list" id="regList"></div>
-          </div>
-
-          <div class="admin-block">
-            <h3>Agregar inscripción manual</h3>
-            <p class="fineprint" style="margin-bottom:12px;">Para jugadores que se inscribieron directo por WhatsApp, sin pasar por el formulario.</p>
-            <form class="admin-form" id="manualForm">
-              <label class="field"><span>Nombre de jugador</span><input type="text" id="mNick" required placeholder="Nick" /></label>
-              <label class="field"><span>ID de jugador</span><input type="text" id="mId" inputmode="numeric" required placeholder="ID" /></label>
-              <label class="field"><span>Modo</span>
-                <select id="mModo"><option value="Solo">Solo</option><option value="Dúo" selected>Dúo</option><option value="Escuadra">Escuadra</option></select>
-              </label>
-              <label class="field"><span>Formato</span>
-                <select id="mFormato"><option value="Podio (1.°, 2.° y 3.°)">Podio (1.°, 2.° y 3.°)</option><option value="Solo ganador">Solo ganador</option><option value="5 puestos + pago por kill">5 puestos + pago por kill</option></select>
-              </label>
-              <label class="field"><span>Jugadores que paga</span>
-                <select id="mPlayers"><option value="1">1 jugador · S/3</option><option value="2">Dúo completo · S/6</option><option value="4">Escuadra completa · S/12</option></select>
-              </label>
-              <div><button class="btn btn-accent" type="submit" style="width:100%;">Agregar pendiente</button></div>
-            </form>
-          </div>
-
-          <div class="two-col">
-            <div class="admin-block" style="margin-bottom:0;">
-              <h3>Publicar un ganador</h3>
-              <form class="admin-form" id="winnerForm" style="grid-template-columns:1fr;">
-                <label class="field"><span>Nombre de jugador o equipo</span><input type="text" id="wNick" required placeholder="Nick del ganador" /></label>
-                <label class="field"><span>Modo y formato</span><input type="text" id="wModo" required placeholder="Ej.: Dúo · Modo Podio" /></label>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                  <label class="field"><span>Puesto</span><input type="text" id="wPos" required placeholder="1.°" /></label>
-                  <label class="field"><span>Premio (S/)</span><input type="text" id="wPrize" inputmode="decimal" required placeholder="60" /></label>
-                </div>
-                <div><button class="btn btn-accent" type="submit" style="width:100%;">Publicar en el ranking</button></div>
-              </form>
-            </div>
-            <div class="admin-block" style="margin-bottom:0;">
-              <h3>Registrar premio entregado</h3>
-              <form class="admin-form" id="payForm" style="grid-template-columns:1fr;">
-                <label class="field"><span>Jugador o equipo que cobró</span><input type="text" id="pNick" required placeholder="Nick" /></label>
-                <label class="field"><span>Detalle</span><input type="text" id="pDetail" required placeholder="Ej.: 1.° puesto · Dúo Modo Podio · Yape" /></label>
-                <label class="field"><span>Monto pagado (S/)</span><input type="text" id="pAmount" inputmode="decimal" required placeholder="60" /></label>
-                <div><button class="btn btn-accent" type="submit" style="width:100%;">Publicar premio entregado</button></div>
-              </form>
-            </div>
-          </div>
-
-          <div class="admin-block" style="margin-top:18px;">
-            <h3>Ganadores y premios que publicaste</h3>
-            <p class="fineprint" style="margin-bottom:12px;">Lo que publiques con los formularios de arriba aparece aquí, en tu panel, durante esta sesión.</p>
-            <div id="rankEmpty" class="empty-note" style="padding:6px 0 14px;">
-              <b>Todavía no hay ganadores registrados en esta sesión.</b><br />
-              La primera sala aún no se juega: publica el primer ganador con el formulario de arriba.
-            </div>
-            <table class="rank-table hidden" id="rankTable" aria-label="Ranking de ganadores">
-              <thead><tr><th>Puesto</th><th>Jugador</th><th>Modo</th><th>Premio</th></tr></thead>
-              <tbody id="rankBody"></tbody>
-            </table>
-            <div id="payEmpty" class="empty-note" style="padding:14px 0 4px;">
-              <b>Aún no registras premios entregados en esta sesión.</b><br />
-              Cada pago por Yape que registres aparecerá en esta lista con su detalle.
-            </div>
-            <ul class="pay-list hidden" id="payList" style="padding:10px 0 4px;"></ul>
-          </div>
-
-          <div class="admin-block" style="margin-top:18px;">
-            <h3>Las cuentas por sala llena (48 jugadores · pozo S/144)</h3>
-            <table class="margin-table">
-              <tr><th>Modo</th><th>Premios que salen</th><th>Te quedan</th></tr>
-              <tr><td>Dúo / Escuadra · Podio</td><td>S/100 (60 + 30 + 10)</td><td class="gain">S/44</td></tr>
-              <tr><td>Dúo / Escuadra · Solo ganador</td><td>S/80</td><td class="gain">S/64</td></tr>
-              <tr><td>Solo · 5 puestos + S/1 por kill</td><td>S/65 + kills (máx. S/47) = hasta S/112</td><td class="gain">S/32 mín.</td></tr>
-            </table>
-            <p class="fineprint" style="margin-top:10px;">Ojo: S/2 por kill no entra con inscripción de S/3 (serían S/94 en kills + S/65 en puestos = S/159, más que el pozo). Para pagar S/2 por kill, ese modo debe cobrar S/5 por jugador: pozo S/240 y te quedarían S/56 por sala llena. Y si una sala no alcanza su mínimo de jugadores, no se juega y se devuelve la inscripción.</p>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <script>
       (function () {
@@ -944,85 +719,18 @@
         });
         function passwordOk(v) { return PW.len(v) && PW.upper(v) && PW.num(v) && PW.sym(v); }
 
-        /* ---------- Contador de cupos y panel ---------- */
+        /* ---------- Contador de cupos ---------- */
         function approvedPlayers() {
           return state.regs.filter(function (r) { return r.status === "aprobado"; })
             .reduce(function (a, r) { return a + r.players; }, 0);
         }
         function renderAll() {
           var ap = approvedPlayers();
-          var pend = state.regs.filter(function (r) { return r.status === "pendiente"; }).length;
           $("cuposNum").textContent = ap;
           $("cuposBar").style.width = Math.min(100, ap / CAPACITY * 100) + "%";
           $("cuposMsg").textContent = ap >= CAPACITY
             ? "¡Sala llena! Escríbenos por WhatsApp para entrar a la lista de espera de la siguiente sala."
             : "Van " + ap + " de 48 cupos confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
-          $("stAprobados").textContent = ap;
-          $("stPendientes").textContent = pend;
-          $("stPozo").textContent = "S/" + ap * PRICE;
-          $("stLibres").textContent = Math.max(0, CAPACITY - ap);
-          renderRegs(); renderWinners(); renderPayments();
-        }
-
-        function renderRegs() {
-          var list = $("regList");
-          list.innerHTML = "";
-          $("regEmpty").style.display = state.regs.length ? "none" : "block";
-          state.regs.slice().reverse().forEach(function (r) {
-            var div = document.createElement("div");
-            div.className = "reg-item";
-            var badge = r.status === "aprobado" ? '<span class="badge badge-apr">Aprobado</span>'
-              : r.status === "rechazado" ? '<span class="badge badge-rej">Rechazado</span>'
-              : '<span class="badge badge-pend">Pendiente</span>';
-            var detail = esc(r.modo) + " · " + esc(r.formato) + " · " + r.players + (r.players === 1 ? " jugador" : " jugadores") + " · S/" + r.players * PRICE;
-            if (r.extra) detail += " · " + esc(r.extra);
-            div.innerHTML =
-              '<div class="who"><b>' + esc(r.nick) + "</b>" + badge +
-              '<div class="meta">ID: ' + esc(r.gameId) + " — " + detail + "</div></div>" +
-              '<div class="reg-actions">' +
-              (r.status !== "aprobado" ? '<button type="button" class="mini-btn approve" data-act="aprobar" data-id="' + r.id + '">Aprobar</button>' : "") +
-              (r.status !== "rechazado" ? '<button type="button" class="mini-btn reject" data-act="rechazar" data-id="' + r.id + '">Rechazar</button>' : "") +
-              '<button type="button" class="mini-btn" data-act="borrar" data-id="' + r.id + '">Borrar</button></div>';
-            list.appendChild(div);
-          });
-        }
-        $("regList").addEventListener("click", function (e) {
-          var btn = e.target.closest("[data-act]");
-          if (!btn) return;
-          var id = Number(btn.getAttribute("data-id"));
-          var reg = state.regs.find(function (r) { return r.id === id; });
-          if (!reg) return;
-          var act = btn.getAttribute("data-act");
-          if (act === "aprobar") reg.status = "aprobado";
-          if (act === "rechazar") reg.status = "rechazado";
-          if (act === "borrar") state.regs = state.regs.filter(function (r) { return r.id !== id; });
-          renderAll();
-        });
-
-        function renderWinners() {
-          var has = state.winners.length > 0;
-          $("rankEmpty").classList.toggle("hidden", has);
-          $("rankTable").classList.toggle("hidden", !has);
-          var body = $("rankBody");
-          body.innerHTML = "";
-          state.winners.forEach(function (w) {
-            var tr = document.createElement("tr");
-            tr.innerHTML = '<td class="pos">' + esc(w.pos) + "</td><td><b>" + esc(w.nick) + "</b></td><td>" + esc(w.modo) + '</td><td class="amt">S/' + esc(w.prize) + "</td>";
-            body.appendChild(tr);
-          });
-        }
-        function renderPayments() {
-          var has = state.payments.length > 0;
-          $("payEmpty").classList.toggle("hidden", has);
-          var ul = $("payList");
-          ul.classList.toggle("hidden", !has);
-          ul.innerHTML = "";
-          state.payments.forEach(function (p) {
-            var li = document.createElement("li");
-            li.className = "pay-item";
-            li.innerHTML = '<div class="who"><b>' + esc(p.nick) + "</b><span>" + esc(p.detail) + '</span></div><div class="monto">S/' + esc(p.amount) + "</div>";
-            ul.appendChild(li);
-          });
         }
 
         /* ---------- Envío del formulario ---------- */
@@ -1097,44 +805,24 @@
           $("successBox").scrollIntoView({ behavior: "smooth", block: "center" });
         });
 
-        /* ---------- Vistas separadas: pública, inscripción y organizador ----------
-           Esta misma dirección tiene tres vistas según el final de la dirección:
-           #inscripcion muestra SOLO el formulario de inscripción, #organizador
-           muestra SOLO la página del organizador, y en cualquier otro caso se
-           ve la página pública (solo modos y premios). */
-        var adminAccount = null; /* { email, pass } definido por el organizador en esta sesión */
-        var adminLogged = false;
+        /* ---------- Vistas separadas: pública e inscripción ----------
+           Esta misma dirección tiene dos vistas según el final de la dirección:
+           #inscripcion muestra SOLO el formulario de inscripción, y en cualquier
+           otro caso se ve la página pública (solo modos y premios). */
         var PUBLIC_TITLE = document.title;
-        var ADMIN_TITLE = "Panel del organizador — Torneos Tío LUX";
-
-        function isAdminRoute() {
-          var h = (location.hash || "").toLowerCase();
-          return h === "#organizador" || h === "#/organizador" || h === "#panel" || h === "#admin";
-        }
 
         function isRegisterRoute() {
           var h = (location.hash || "").toLowerCase();
           return h === "#inscripcion" || h === "#/inscripcion" || h === "#registro" || h === "#inscribirme";
         }
 
-        function refreshAuthView() {
-          var hasAccount = !!adminAccount;
-          $("authSetup").classList.toggle("hidden", hasAccount);
-          $("authLogin").classList.toggle("hidden", !hasAccount || adminLogged);
-          $("adminPanel").classList.toggle("open", adminLogged);
-          $("adminPanel").classList.toggle("hidden", !adminLogged);
-          if (adminLogged) $("sessionEmail").textContent = adminAccount.email;
-        }
-
         var REG_TITLE = "Inscripción — Torneos Tío LUX";
         var currentView = "public";
         function applyRoute() {
-          var view = isAdminRoute() ? "admin" : isRegisterRoute() ? "register" : "public";
+          var view = isRegisterRoute() ? "register" : "public";
           $("publicView").classList.toggle("hidden", view !== "public");
           $("registerView").classList.toggle("hidden", view !== "register");
-          $("adminView").classList.toggle("hidden", view !== "admin");
-          document.title = view === "admin" ? ADMIN_TITLE : view === "register" ? REG_TITLE : PUBLIC_TITLE;
-          if (view === "admin") refreshAuthView();
+          document.title = view === "register" ? REG_TITLE : PUBLIC_TITLE;
           if (view !== currentView) { window.scrollTo(0, 0); currentView = view; }
         }
         window.addEventListener("hashchange", applyRoute);
@@ -1145,86 +833,7 @@
           applyRoute();
           window.scrollTo(0, 0);
         }
-        $("backToPublicTop").addEventListener("click", goPublic);
         $("backToPublicReg").addEventListener("click", goPublic);
-
-        function authError(id, msg) {
-          var box = $(id);
-          box.textContent = msg;
-          box.classList.add("show");
-        }
-        function authClear(id) { $(id).classList.remove("show"); }
-
-        /* Reglas de contraseña en vivo para la clave del organizador */
-        $("sPass").addEventListener("input", function () {
-          var v = $("sPass").value;
-          document.querySelectorAll("#setupPwRules li").forEach(function (li) {
-            li.classList.toggle("ok", PW[li.getAttribute("data-rule")](v));
-          });
-        });
-
-        $("setupForm").addEventListener("submit", function (e) {
-          e.preventDefault();
-          authClear("setupError");
-          var email = $("sEmail").value.trim().toLowerCase();
-          var pass = $("sPass").value;
-          var pass2 = $("sPass2").value;
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return authError("setupError", "Escribe un correo válido: será tu usuario para entrar al panel.");
-          if (!passwordOk(pass)) return authError("setupError", "Tu contraseña aún no cumple la política de seguridad: mínimo 8 caracteres, una mayúscula, un número y un símbolo.");
-          if (pass !== pass2) return authError("setupError", "Las dos contraseñas no coinciden. Escríbela igual en ambos campos.");
-          adminAccount = { email: email, pass: pass };
-          adminLogged = true;
-          $("sPass").value = ""; $("sPass2").value = "";
-          refreshAuthView();
-          renderAll();
-        });
-
-        $("loginForm").addEventListener("submit", function (e) {
-          e.preventDefault();
-          authClear("loginError");
-          var email = $("lEmail").value.trim().toLowerCase();
-          var pass = $("lPass").value;
-          if (!adminAccount || email !== adminAccount.email || pass !== adminAccount.pass) {
-            return authError("loginError", "Correo o contraseña incorrectos. Revisa tus datos e inténtalo de nuevo.");
-          }
-          adminLogged = true;
-          $("lPass").value = "";
-          refreshAuthView();
-          renderAll();
-        });
-
-        $("logoutAdmin").addEventListener("click", function () {
-          adminLogged = false;
-          authClear("loginError");
-          refreshAuthView();
-          window.scrollTo(0, 0);
-        });
-
-        $("manualForm").addEventListener("submit", function (e) {
-          e.preventDefault();
-          state.regs.push({
-            id: ++seq,
-            nick: $("mNick").value.trim(), gameId: $("mId").value.trim(),
-            modo: $("mModo").value, formato: $("mFormato").value,
-            players: Number($("mPlayers").value), status: "pendiente", extra: "Agregada a mano (WhatsApp)"
-          });
-          e.target.reset();
-          renderAll();
-        });
-
-        $("winnerForm").addEventListener("submit", function (e) {
-          e.preventDefault();
-          state.winners.push({ pos: $("wPos").value.trim(), nick: $("wNick").value.trim(), modo: $("wModo").value.trim(), prize: $("wPrize").value.trim() });
-          e.target.reset();
-          renderAll();
-        });
-
-        $("payForm").addEventListener("submit", function (e) {
-          e.preventDefault();
-          state.payments.push({ nick: $("pNick").value.trim(), detail: $("pDetail").value.trim(), amount: $("pAmount").value.trim() });
-          e.target.reset();
-          renderAll();
-        });
 
         fillFormats(false);
         applyRoute();
