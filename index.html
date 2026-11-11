@@ -319,7 +319,6 @@
       .auth-tab.active { background: var(--surface); color: var(--accent-strong); border-color: var(--line); }
       .turnstile-wrap { display: grid; gap: 6px; }
       .turnstile-wrap .cf-turnstile { min-height: 65px; }
-      #loginTurnstile { min-height: 65px; }
       .verified-badge { display: inline-flex; align-items: center; min-height: 28px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--ok); color: var(--ok); font-weight: 700; font-size: .85rem; vertical-align: middle; margin-left: 8px; }
       .locked-box { border-style: dashed; text-align: left; }
       .locked-box h3 { font-size: 1.25rem; text-transform: uppercase; margin-bottom: 6px; }
@@ -532,7 +531,7 @@
                   <input type="password" id="liPass" autocomplete="current-password" placeholder="Tu contraseña" required />
                 </label>
                 <div class="turnstile-wrap">
-                  <div id="loginTurnstile"></div>
+                  <div class="cf-turnstile" data-sitekey="0x4AAAAAAF9OvuttQOhM5XrN" data-callback="onLoginTurnstileSuccess" data-expired-callback="onLoginTurnstileExpired" data-error-callback="onLoginTurnstileExpired"></div>
                   <p class="fineprint">Completa el captcha de Cloudflare para confirmar que eres una persona real.</p>
                 </div>
                 <div class="form-error" id="loginError" role="alert"></div>
@@ -847,29 +846,29 @@
         }
         /* ---------- Turnstile propio del inicio de sesión ----------
            El token del registro queda consumido al crear la cuenta, así que el
-           login usa su propio widget y su propio token, independiente. */
+           login usa su propio widget declarativo (el mismo mecanismo del
+           registro: div .cf-turnstile con la site key en el formulario) y su
+           propio token, independiente. */
         var loginTurnstileToken = null;
-        var loginWidgetId = null;
-        function renderLoginTurnstile() {
-          var box = $("loginTurnstile");
-          if (!box || loginWidgetId !== null) return;
-          if (!window.turnstile || typeof window.turnstile.render !== "function") {
-            setTimeout(renderLoginTurnstile, 300);
-            return;
+        window.onLoginTurnstileSuccess = function (token) { loginTurnstileToken = token; };
+        window.onLoginTurnstileExpired = function () { loginTurnstileToken = null; };
+        function loginTurnstileEl() {
+          var form = $("loginForm");
+          return form ? form.querySelector(".cf-turnstile") : null;
+        }
+        function getLoginTurnstileToken() {
+          if (loginTurnstileToken) return loginTurnstileToken;
+          var el = loginTurnstileEl();
+          if (el && window.turnstile && typeof window.turnstile.getResponse === "function") {
+            try { loginTurnstileToken = window.turnstile.getResponse(el) || null; } catch (e) {}
           }
-          try {
-            loginWidgetId = window.turnstile.render(box, {
-              sitekey: "0x4AAAAAAF9OvuttQOhM5XrN",
-              callback: function (token) { loginTurnstileToken = token; },
-              "expired-callback": function () { loginTurnstileToken = null; },
-              "error-callback": function () { loginTurnstileToken = null; }
-            });
-          } catch (e) { loginWidgetId = null; }
+          return loginTurnstileToken;
         }
         function resetLoginTurnstile() {
           loginTurnstileToken = null;
-          if (window.turnstile && loginWidgetId !== null) {
-            try { window.turnstile.reset(loginWidgetId); } catch (e) {}
+          var el = loginTurnstileEl();
+          if (el && window.turnstile) {
+            try { window.turnstile.reset(el); } catch (e) {}
           }
         }
         function refreshAuthUI() {
@@ -923,7 +922,6 @@
           $("tabLogin").classList.toggle("active", !isSignup);
           $("signupForm").classList.toggle("hidden", !isSignup);
           $("loginForm").classList.toggle("hidden", isSignup);
-          if (!isSignup) renderLoginTurnstile();
         }
         $("tabSignup").addEventListener("click", function () { setAuthTab("signup"); });
         $("tabLogin").addEventListener("click", function () { setAuthTab("login"); });
@@ -997,11 +995,12 @@
           var pass = $("liPass").value;
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return authShowError("loginError", "Escribe un correo válido.");
           if (!pass) return authShowError("loginError", "Escribe tu contraseña.");
-          if (!loginTurnstileToken) return authShowError("loginError", "Completa el captcha para confirmar que eres una persona real.");
+          var captchaToken = getLoginTurnstileToken();
+          if (!captchaToken) return authShowError("loginError", "Completa el captcha para confirmar que eres una persona real.");
           var btn = $("loginBtn");
           btn.disabled = true;
           btn.textContent = "Ingresando…";
-          sb.auth.signInWithPassword({ email: email, password: pass, options: { captchaToken: loginTurnstileToken } }).then(function (res) {
+          sb.auth.signInWithPassword({ email: email, password: pass, options: { captchaToken: captchaToken } }).then(function (res) {
             btn.disabled = false;
             btn.textContent = "Iniciar sesión";
             resetLoginTurnstile();
