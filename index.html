@@ -171,6 +171,15 @@
       .bar i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #e56b00, #ffb35c); transition: width 0.5s ease; }
       .cupos p { margin: 0; color: var(--muted); font-size: 0.92rem; }
       .cupos .live-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); margin-right: 6px; }
+      .cupos .room-name {
+        font-family: "Rajdhani", sans-serif; font-weight: 700;
+        font-size: clamp(1.35rem, 4.5vw, 1.7rem); line-height: 1.15; color: var(--ink);
+      }
+      .cupos .room-name .room-when { color: var(--ink-soft); font-weight: 600; }
+      .cupos .room-mode { margin: 0; font-size: 0.92rem; color: var(--muted); }
+      .cupos .room-mode b { color: var(--accent-strong); }
+      .cupos .btn { justify-self: stretch; }
+      @media (min-width: 700px) { .cupos .btn { justify-self: start; min-width: 280px; } }
 
       /* ---------- Modos ---------- */
       .modes { display: grid; gap: 20px; }
@@ -355,14 +364,17 @@
     </header>
 
     <div class="wrap">
-      <!-- Contador de cupos -->
+      <!-- Próxima sala: la que el organizador tiene abierta en su panel -->
       <div class="cupos" role="status" aria-live="polite">
         <div class="cupos-top">
-          <span class="label"><span class="live-dot"></span>Cupos de la próxima sala</span>
+          <span class="label"><span class="live-dot"></span>Próxima sala</span>
           <span class="count"><span id="cuposNum">0</span> <small>/ 48 jugadores</small></span>
         </div>
+        <div class="room-name">Sala Tio Lux 01 <span class="room-when">— sala 15 domingo · 8:30 p. m.</span></div>
+        <p class="room-mode">Modo <b>Solo</b> · Premios hasta el 5.° puesto + <b>S/1 por kill</b> · Inscripción <b>S/3</b> por jugador</p>
         <div class="bar"><i id="cuposBar"></i></div>
-        <p id="cuposMsg">Las inscripciones se confirman por WhatsApp con la captura del pago. Cuando el Tío LUX aprueba tu pago, tu cupo se suma aquí.</p>
+        <p id="cuposMsg">Van 0 de 48 cupos confirmados. La sala se juega al llegar a 36 jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.</p>
+        <a class="btn btn-accent" href="#inscripcion" id="cupoBtn">Quiero mi cupo</a>
       </div>
 
       <!-- ================= MODOS ================= -->
@@ -1103,19 +1115,36 @@
           });
         });
 
-        /* ---------- Contador de cupos ---------- */
+        /* ---------- Próxima sala (la abierta en el panel del organizador) ---------- */
+        var NEXT_ROOM = {
+          title: "Sala Tio Lux 01",
+          dateText: "sala 15 domingo",
+          timeText: "8:30 p. m.",
+          modo: "solo",
+          formato: "kills",
+          capacity: 48,
+          minPlayers: 36,
+          confirmedPlayers: 0
+        };
         function approvedPlayers() {
           return state.regs.filter(function (r) { return r.status === "aprobado"; })
             .reduce(function (a, r) { return a + r.players; }, 0);
         }
         function renderAll() {
-          var ap = approvedPlayers();
+          var ap = NEXT_ROOM.confirmedPlayers + approvedPlayers();
           $("cuposNum").textContent = ap;
-          $("cuposBar").style.width = Math.min(100, ap / CAPACITY * 100) + "%";
-          $("cuposMsg").textContent = ap >= CAPACITY
+          $("cuposBar").style.width = Math.min(100, ap / NEXT_ROOM.capacity * 100) + "%";
+          $("cuposMsg").textContent = ap >= NEXT_ROOM.capacity
             ? "¡Sala llena! Escríbenos por WhatsApp para entrar a la lista de espera de la siguiente sala."
-            : "Van " + ap + " de 48 cupos confirmados. La sala se juega al llegar a 36 jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
+            : "Van " + ap + " de " + NEXT_ROOM.capacity + " cupos confirmados. La sala se juega al llegar a " + NEXT_ROOM.minPlayers + " jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
         }
+        /* "Quiero mi cupo": abre la inscripción con el modo de esta sala ya elegido */
+        $("cupoBtn").addEventListener("click", function () {
+          $("fModo").value = NEXT_ROOM.modo;
+          fillFormats(false);
+          $("fFormato").value = NEXT_ROOM.formato;
+          updateTeamBlocks();
+        });
 
         /* ---------- Envío del formulario ---------- */
         function showError(msg) {
