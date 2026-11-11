@@ -371,7 +371,7 @@
                 <tr><td class="place">2.° puesto</td><td>S/30</td></tr>
                 <tr><td class="place">3.° puesto</td><td>S/10</td></tr>
               </table>
-              <p class="mode-meta">Premio por equipo. La sala se juega con un mínimo de 34 jugadores confirmados.</p>
+              <p class="mode-meta">Premio por equipo. La sala se juega con un mínimo de 36 jugadores confirmados: 18 dúos o 9 escuadras completas.</p>
               <button class="btn btn-accent" type="button" data-pick data-modo="duo" data-formato="podio">Elegir Modo Podio</button>
             </div>
           </article>
@@ -385,9 +385,9 @@
               <h3>Solo Ganador</h3>
               <p class="desc">Todo o nada: el primer puesto se lleva el pozo de premios completo.</p>
               <table class="prize-table">
-                <tr><td class="place">1.° puesto (único premio)</td><td>S/80</td></tr>
+                <tr><td class="place">1.° puesto (único premio)</td><td>S/100</td></tr>
               </table>
-              <p class="mode-meta">Premio por equipo. La sala se juega con un mínimo de 30 jugadores confirmados.</p>
+              <p class="mode-meta">Premio por equipo. La sala se juega con un mínimo de 36 jugadores confirmados: 18 dúos o 9 escuadras completas.</p>
               <button class="btn btn-accent" type="button" data-pick data-modo="duo" data-formato="ganador">Elegir Solo Ganador</button>
             </div>
           </article>
@@ -407,7 +407,7 @@
                 <tr><td class="place">4.° y 5.° puesto</td><td>S/5 c/u</td></tr>
                 <tr><td class="place">Por cada kill</td><td>S/1</td></tr>
               </table>
-              <p class="mode-meta">Premios individuales. La sala se juega con un mínimo de 34 jugadores confirmados.</p>
+              <p class="mode-meta">Premios individuales. La sala se juega con un mínimo de 36 jugadores confirmados.</p>
               <button class="btn btn-accent" type="button" data-pick data-modo="solo" data-formato="kills">Elegir modo Solo</button>
             </div>
           </article>
@@ -591,11 +591,11 @@
           solo: [{ v: "kills", t: "5 puestos + pago por kill (S/1 por kill)" }],
           duo: [
             { v: "podio", t: "Modo Podio: 1.° S/60 · 2.° S/30 · 3.° S/10 (por equipo)" },
-            { v: "ganador", t: "Solo Ganador: 1.° S/80 (por equipo)" }
+            { v: "ganador", t: "Solo Ganador: 1.° S/100 (por equipo)" }
           ],
           escuadra: [
             { v: "podio", t: "Modo Podio: 1.° S/60 · 2.° S/30 · 3.° S/10 (por equipo)" },
-            { v: "ganador", t: "Solo Ganador: 1.° S/80 (por equipo)" }
+            { v: "ganador", t: "Solo Ganador: 1.° S/100 (por equipo)" }
           ]
         };
         var MODO_NAMES = { solo: "Solo", duo: "Dúo", escuadra: "Escuadra" };
@@ -662,7 +662,7 @@
             note: "Se premian los tres primeros puestos. El premio es por equipo y se reparte entre sus integrantes."
           },
           ganador: {
-            rows: [["1.° puesto (único premio)", "S/80"]],
+            rows: [["1.° puesto (único premio)", "S/100"]],
             note: "Solo gana el primer puesto: no hay premio para el 2.° ni el 3.° lugar. El premio es por equipo."
           },
           kills: {
@@ -730,7 +730,7 @@
           $("cuposBar").style.width = Math.min(100, ap / CAPACITY * 100) + "%";
           $("cuposMsg").textContent = ap >= CAPACITY
             ? "¡Sala llena! Escríbenos por WhatsApp para entrar a la lista de espera de la siguiente sala."
-            : "Van " + ap + " de 48 cupos confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
+            : "Van " + ap + " de 48 cupos confirmados. La sala se juega al llegar a 36 jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
         }
 
         /* ---------- Envío del formulario ---------- */
