@@ -319,6 +319,7 @@
       .auth-tab.active { background: var(--surface); color: var(--accent-strong); border-color: var(--line); }
       .turnstile-wrap { display: grid; gap: 6px; }
       .turnstile-wrap .cf-turnstile { min-height: 65px; }
+      #loginTurnstile { min-height: 65px; }
       .verified-badge { display: inline-flex; align-items: center; min-height: 28px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--ok); color: var(--ok); font-weight: 700; font-size: .85rem; vertical-align: middle; margin-left: 8px; }
       .locked-box { border-style: dashed; text-align: left; }
       .locked-box h3 { font-size: 1.25rem; text-transform: uppercase; margin-bottom: 6px; }
@@ -530,6 +531,10 @@
                 <label class="field"><span>Contraseña</span>
                   <input type="password" id="liPass" autocomplete="current-password" placeholder="Tu contraseña" required />
                 </label>
+                <div class="turnstile-wrap">
+                  <div id="loginTurnstile"></div>
+                  <p class="fineprint">Completa el captcha de Cloudflare para confirmar que eres una persona real.</p>
+                </div>
                 <div class="form-error" id="loginError" role="alert"></div>
                 <button class="btn btn-accent" type="submit" id="loginBtn" style="width:100%;">Iniciar sesión</button>
                 <p class="fineprint">Solo puedes entrar si ya confirmaste tu correo de verificación. Si no te llegó, revisa spam o espera unos minutos y vuelve a registrarte si la cuenta no se creó.</p>
@@ -840,6 +845,33 @@
           turnstileToken = null;
           try { if (window.turnstile) window.turnstile.reset(); } catch (e) {}
         }
+        /* ---------- Turnstile propio del inicio de sesión ----------
+           El token del registro queda consumido al crear la cuenta, así que el
+           login usa su propio widget y su propio token, independiente. */
+        var loginTurnstileToken = null;
+        var loginWidgetId = null;
+        function renderLoginTurnstile() {
+          var box = $("loginTurnstile");
+          if (!box || loginWidgetId !== null) return;
+          if (!window.turnstile || typeof window.turnstile.render !== "function") {
+            setTimeout(renderLoginTurnstile, 300);
+            return;
+          }
+          try {
+            loginWidgetId = window.turnstile.render(box, {
+              sitekey: "0x4AAAAAAF9OvuttQOhM5XrN",
+              callback: function (token) { loginTurnstileToken = token; },
+              "expired-callback": function () { loginTurnstileToken = null; },
+              "error-callback": function () { loginTurnstileToken = null; }
+            });
+          } catch (e) { loginWidgetId = null; }
+        }
+        function resetLoginTurnstile() {
+          loginTurnstileToken = null;
+          if (window.turnstile && loginWidgetId !== null) {
+            try { window.turnstile.reset(loginWidgetId); } catch (e) {}
+          }
+        }
         function refreshAuthUI() {
           var loading = $("authLoading"), out = $("authLoggedOut"), inn = $("authLoggedIn");
           var locked = $("lockedBox"), summary = $("formatSummary"), form = $("regForm");
@@ -891,6 +923,7 @@
           $("tabLogin").classList.toggle("active", !isSignup);
           $("signupForm").classList.toggle("hidden", !isSignup);
           $("loginForm").classList.toggle("hidden", isSignup);
+          if (!isSignup) renderLoginTurnstile();
         }
         $("tabSignup").addEventListener("click", function () { setAuthTab("signup"); });
         $("tabLogin").addEventListener("click", function () { setAuthTab("login"); });
@@ -964,12 +997,14 @@
           var pass = $("liPass").value;
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return authShowError("loginError", "Escribe un correo válido.");
           if (!pass) return authShowError("loginError", "Escribe tu contraseña.");
+          if (!loginTurnstileToken) return authShowError("loginError", "Completa el captcha para confirmar que eres una persona real.");
           var btn = $("loginBtn");
           btn.disabled = true;
           btn.textContent = "Ingresando…";
-          sb.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
+          sb.auth.signInWithPassword({ email: email, password: pass, options: { captchaToken: loginTurnstileToken } }).then(function (res) {
             btn.disabled = false;
             btn.textContent = "Iniciar sesión";
+            resetLoginTurnstile();
             if (res.error) return authShowError("loginError", friendlyAuthError(res.error, "No se pudo iniciar sesión."));
             var user = res.data ? res.data.user : null;
             if (user && !isVerified(user)) {
@@ -984,6 +1019,7 @@
           }).catch(function (err) {
             btn.disabled = false;
             btn.textContent = "Iniciar sesión";
+            resetLoginTurnstile();
             authShowError("loginError", friendlyAuthError(err, "No se pudo iniciar sesión."));
           });
         });
