@@ -1088,13 +1088,19 @@
           });
         }
 
-        function checkMyInscription() {
+        function checkMyInscription(force) {
           if (!NEXT_ROOM) return;
           if (!sb || !currentUser || !isVerified(currentUser)) return;
           var email = currentUser.email || "";
           if (!email) return;
-          if (myInscriptionFor === email) { applyInscriptionStatus(); return; }
-          myInscriptionFor = email;
+          /* La caché es por (correo, sala): el estado en una sala no vale
+             para otra, y tras inscribirse hay que volver a consultar.
+             Antes la clave era solo el correo y nunca se invalidaba tras
+             un envío, así que el estado quedaba congelado en "none" toda
+             la sesión y el formulario seguía aceptando inscripciones. */
+          var cacheKey = email + "||" + NEXT_ROOM.title;
+          if (!force && myInscriptionFor === cacheKey) { applyInscriptionStatus(); return; }
+          myInscriptionFor = cacheKey;
           var salaConsultada = NEXT_ROOM.title;
           sb.from("inscriptions")
             .select("*")
@@ -1722,7 +1728,13 @@
               }
               buildRooms(true);
               renderAll();
-              if (changed) applyInscriptionStatus();
+              if (changed) {
+                applyInscriptionStatus();
+                /* La sala elegida cambió al llegar las salas en vivo: la
+                   consulta anterior era de otra sala (o no se hizo), así
+                   que hay que volver a consultar el cupo en la sala real. */
+                if (currentUser && isVerified(currentUser)) checkMyInscription(true);
+              }
               refreshLiveCounter();
             })
             .catch(function (err) {
@@ -1814,12 +1826,40 @@
           if (submitBtn) submitBtn.disabled = true;
           $("saveWarning").classList.remove("show");
 
+          /* true si el índice único parcial de Supabase rechazó el
+             insert por duplicado (código 23505): el respaldo en base de
+             datos actuó porque la re-comprobación previa no lo frenó. */
+          var saveBlockedDuplicate = false;
+
           function finishInscription(saved) {
             if (submitBtn) submitBtn.disabled = false;
-            if (!saved) $("saveWarning").classList.add("show");
+            if (!saved && !saveBlockedDuplicate) $("saveWarning").classList.add("show");
             /* La lista de "Mis cupos" quedó desactualizada: que la próxima
                vez que se vea el inicio vuelva a consultar Supabase. */
             myCuposFor = null;
+            if (saved) {
+              /* Guardado OK: la inscripción propia en esta sala ya es
+                 "pendiente". Se actualiza la caché para que en esta
+                 sesión ya no se pueda volver a inscribir a la misma
+                 sala, pero NO se oculta el formulario aquí: la caja de
+                 éxito (con el botón de WhatsApp) vive dentro del
+                 formulario y el jugador la tiene que ver. El envío
+                 vuelve a re-comprobar antes de insertar, así que un
+                 segundo envío queda bloqueado igualmente. */
+              myInscription = {
+                sala: NEXT_ROOM.title, fecha: NEXT_ROOM.dateText, hora: NEXT_ROOM.timeText,
+                modo: MODO_NAMES[modo], formato: FORMATO_NAMES[formato],
+                correo: email, usuario: nick, ff_id: gid, estado: "pendiente"
+              };
+              myInscriptionState = "pendiente";
+              myInscriptionFor = email + "||" + NEXT_ROOM.title;
+            } else if (saveBlockedDuplicate) {
+              /* El índice único rechazó el duplicado: refrescar la
+                 tarjeta de estado con la fila real y avisar. */
+              myInscriptionFor = null;
+              checkMyInscription(true);
+              showError("Ya tienes una inscripción en esta sala. Revisa su estado arriba: si está pendiente, envía la captura de tu pago por Yape; si ya está aprobada, tu cupo está listo.");
+            }
 
             state.regs.push({
               id: ++seq, nick: nick, gameId: gid, sala: NEXT_ROOM.title, modo: MODO_NAMES[modo],
@@ -1837,28 +1877,77 @@
             (saved ? $("successBox") : $("saveWarning")).scrollIntoView({ behavior: "smooth", block: "center" });
           }
 
-          var saveAttempt;
-          if (!sb) {
-            saveAttempt = Promise.resolve(false);
-          } else {
-            saveAttempt = Promise.resolve()
-              .then(function () { return sb.from("inscriptions").insert(inscriptionPayload); })
+          /* Re-comprobación anti-duplicado ANTES de insertar: una sola
+             inscripción activa (pendiente o aprobada) por (correo, sala).
+             Si la anterior fue rechazada, sí se puede inscribir de nuevo.
+             Si la consulta falla o se agota el tiempo (~3 s), NO se
+             bloquea el envío: se sigue con el guardado y el índice único
+             parcial de Supabase es el respaldo que rechaza el duplicado. */
+          function hasActiveInscription() {
+            if (!sb) return Promise.resolve(false);
+            var checkTimeout = new Promise(function (resolve) {
+              setTimeout(function () { resolve(null); }, 3000);
+            });
+            var query = sb.from("inscriptions")
+              .select("estado")
+              .eq("correo", email)
+              .eq("sala", NEXT_ROOM.title)
+              .order("created_at", { ascending: false })
+              .limit(1)
               .then(function (res) {
-                if (res && res.error) {
-                  console.warn("No se pudo guardar la inscripción en Supabase:", res.error.message || res.error);
-                  return false;
-                }
-                return true;
+                if (res && res.error) return null;
+                var rows = (res && res.data) || [];
+                if (!rows.length) return false;
+                var st = String(rows[0].estado || "").toLowerCase();
+                return st === "pendiente" || st === "aprobada";
               })
-              .catch(function (err) {
-                console.warn("No se pudo guardar la inscripción en Supabase:", err);
-                return false;
-              });
+              .catch(function () { return null; });
+            return Promise.race([query, checkTimeout]).then(function (blocked) {
+              return blocked === true;
+            });
           }
-          var saveTimeout = new Promise(function (resolve) {
-            setTimeout(function () { resolve(false); }, 3000);
+
+          function startSave() {
+            var saveAttempt;
+            if (!sb) {
+              saveAttempt = Promise.resolve(false);
+            } else {
+              saveAttempt = Promise.resolve()
+                .then(function () { return sb.from("inscriptions").insert(inscriptionPayload); })
+                .then(function (res) {
+                  if (res && res.error) {
+                    if (res.error.code === "23505") {
+                      /* El índice único parcial rechazó el duplicado. */
+                      saveBlockedDuplicate = true;
+                    }
+                    console.warn("No se pudo guardar la inscripción en Supabase:", res.error.message || res.error);
+                    return false;
+                  }
+                  return true;
+                })
+                .catch(function (err) {
+                  console.warn("No se pudo guardar la inscripción en Supabase:", err);
+                  return false;
+                });
+            }
+            var saveTimeout = new Promise(function (resolve) {
+              setTimeout(function () { resolve(false); }, 3000);
+            });
+            Promise.race([saveAttempt, saveTimeout]).then(finishInscription);
+          }
+
+          hasActiveInscription().then(function (blocked) {
+            if (blocked) {
+              if (submitBtn) submitBtn.disabled = false;
+              /* Refrescar la tarjeta de estado con la fila real y avisar:
+                 el formulario se oculta y se muestra su estado. */
+              myInscriptionFor = null;
+              checkMyInscription(true);
+              showError("Ya tienes una inscripción en esta sala. Revisa su estado arriba: si está pendiente, envía la captura de tu pago por Yape; si ya está aprobada, tu cupo está listo.");
+              return;
+            }
+            startSave();
           });
-          Promise.race([saveAttempt, saveTimeout]).then(finishInscription);
         });
 
         /* ---------- Vistas separadas: pública e inscripción ----------
