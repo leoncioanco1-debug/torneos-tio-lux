@@ -300,6 +300,13 @@
       .pw-rules li::before { content: "○"; position: absolute; left: 4px; }
       .pw-rules li.ok { color: var(--ok); font-weight: 600; }
       .pw-rules li.ok::before { content: "●"; }
+      .pw-wrap { position: relative; display: block; }
+      label.field > span.pw-wrap { margin-bottom: 0; }
+      .pw-wrap input[type="password"], .pw-wrap input[type="text"] { padding-right: 46px; }
+      .pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; border-radius: 8px; color: var(--muted); cursor: pointer; padding: 0; }
+      .pw-toggle:hover { color: var(--ink); background: var(--bg-2); }
+      .pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .pw-toggle svg { width: 22px; height: 22px; display: block; }
       .total-box {
         display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
         background: var(--accent-soft); border: 1px solid var(--accent);
@@ -575,21 +582,21 @@
               <button type="button" class="auth-tab" id="tabLogin">Iniciar sesión</button>
             </div>
 
-            <form id="signupForm" novalidate>
+            <form id="signupForm" method="post" novalidate>
               <div class="form-grid">
                 <div class="half">
                   <label class="field"><span>Usuario</span>
-                    <input type="text" id="suUser" autocomplete="username" placeholder="Ej.: LuxSombra" required />
+                    <input type="text" id="suUser" name="username" autocomplete="username" placeholder="Ej.: LuxSombra" required />
                     <small>Tu nombre de jugador o usuario en Torneos Tío LUX.</small>
                   </label>
                   <label class="field"><span>Correo electrónico</span>
-                    <input type="email" id="suEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
+                    <input type="email" id="suEmail" name="email" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
                     <small>A este correo te llega la verificación.</small>
                   </label>
                 </div>
                 <div>
                   <label class="field"><span>Contraseña</span>
-                    <input type="password" id="suPass" autocomplete="new-password" placeholder="Crea una contraseña segura" required />
+                    <span class="pw-wrap"><input type="password" id="suPass" name="new-password" autocomplete="new-password" placeholder="Crea una contraseña segura" required /><button type="button" class="pw-toggle" data-target="suPass" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="ic-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ic-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></span>
                   </label>
                   <ul class="pw-rules" id="suPwRules">
                     <li data-rule="len">Mínimo 8 caracteres</li>
@@ -600,11 +607,11 @@
                 </div>
                 <div class="half">
                   <label class="field"><span>Tu ID de jugador de Free Fire</span>
-                    <input type="text" id="suFFId" inputmode="numeric" autocomplete="off" placeholder="Ej.: 5123456789" required />
+                    <input type="text" id="suFFId" name="ff-id" inputmode="numeric" autocomplete="off" placeholder="Ej.: 5123456789" required />
                     <small>Lo encuentras en tu perfil dentro del juego, bajo tu nick.</small>
                   </label>
                   <label class="field"><span>WhatsApp (opcional)</span>
-                    <input type="text" id="suWhats" inputmode="tel" autocomplete="tel" placeholder="Ej.: 987 654 321" />
+                    <input type="text" id="suWhats" name="whatsapp" inputmode="tel" autocomplete="tel" placeholder="Ej.: 987 654 321" />
                   </label>
                 </div>
                 <div class="turnstile-wrap">
@@ -621,13 +628,13 @@
               </div>
             </form>
 
-            <form id="loginForm" class="hidden" novalidate>
+            <form id="loginForm" method="post" class="hidden" novalidate>
               <div class="form-grid">
                 <label class="field"><span>Correo electrónico</span>
-                  <input type="email" id="liEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
+                  <input type="email" id="liEmail" name="email" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
                 </label>
                 <label class="field"><span>Contraseña</span>
-                  <input type="password" id="liPass" autocomplete="current-password" placeholder="Tu contraseña" required />
+                  <span class="pw-wrap"><input type="password" id="liPass" name="password" autocomplete="current-password" placeholder="Tu contraseña" required /><button type="button" class="pw-toggle" data-target="liPass" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="ic-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ic-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></span>
                 </label>
                 <div class="turnstile-wrap">
                   <div id="loginTurnstile" class="cf-turnstile" data-sitekey="0x4AAAAAAF9OvuttQOhM5XrN"></div>
@@ -1385,6 +1392,28 @@
         } else {
           refreshAuthUI();
         }
+
+        /* Ojito para ver/ocultar la contraseña (registro y login). Solo cambia
+           el tipo del input y el ícono; no toca el envío del formulario ni el captcha. */
+        (function () {
+          var toggles = document.querySelectorAll(".pw-toggle");
+          for (var i = 0; i < toggles.length; i++) {
+            toggles[i].addEventListener("click", function () {
+              var input = document.getElementById(this.getAttribute("data-target"));
+              if (!input) return;
+              var show = input.type === "password";
+              input.type = show ? "text" : "password";
+              this.setAttribute("aria-pressed", show ? "true" : "false");
+              this.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
+              this.setAttribute("title", show ? "Ocultar contraseña" : "Mostrar contraseña");
+              var eye = this.querySelector(".ic-eye");
+              var eyeOff = this.querySelector(".ic-eye-off");
+              if (eye) eye.classList.toggle("hidden", show);
+              if (eyeOff) eyeOff.classList.toggle("hidden", !show);
+              input.focus();
+            });
+          }
+        })();
 
         $("signupForm").addEventListener("submit", function (e) {
           e.preventDefault();
