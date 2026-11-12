@@ -157,9 +157,11 @@
       .btn svg { flex: none; }
 
       /* Cupos counter */
+      .rooms-list { display: grid; gap: 20px; margin: 30px 0 44px; }
+      @media (min-width: 860px) { .rooms-list { grid-template-columns: 1fr 1fr; } }
       .cupos {
         position: relative;
-        margin: 30px 0 44px;
+        margin: 0;
         background: var(--surface);
         color: var(--ink);
         border: 1px solid var(--line);
@@ -185,6 +187,14 @@
       .cupos .room-mode b { color: var(--accent-strong); }
       .cupos .btn { justify-self: stretch; }
       @media (min-width: 700px) { .cupos .btn { justify-self: start; min-width: 280px; } }
+      .cupos.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
+      .picked-badge {
+        display: none;
+        font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 0.85rem;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        color: var(--accent-strong);
+      }
+      .cupos.selected .picked-badge { display: inline; }
 
       /* ---------- Modos ---------- */
       .modes { display: grid; gap: 20px; }
@@ -413,18 +423,15 @@
     </header>
 
     <div class="wrap">
-      <!-- Próxima sala: la que el organizador tiene abierta en su panel -->
-      <div class="cupos" role="status" aria-live="polite">
-        <div class="cupos-top">
-          <span class="label"><span class="live-dot"></span>Próxima sala</span>
-          <span class="count"><span id="cuposNum">0</span> <small>/ 48 jugadores</small></span>
-        </div>
-        <div class="room-name">Sala Tio Lux 01 <span class="room-when">— sala 15 domingo · 8:30 p. m.</span></div>
-        <p class="room-mode">Modo <b>Solo</b> · Premios hasta el 5.° puesto + <b>S/1 por kill</b> · Inscripción <b>S/3</b> por jugador</p>
-        <div class="bar"><i id="cuposBar"></i></div>
-        <p id="cuposMsg">Van 0 de 48 cupos confirmados. La sala se juega al llegar a 36 jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.</p>
-        <a class="btn btn-accent" href="#inscripcion" id="cupoBtn">Quiero mi cupo</a>
+      <!-- Salas abiertas: las que el organizador tiene abiertas en su panel.
+           Las tarjetas se generan desde la lista ROOMS embebida en el script;
+           cada una consulta su propio contador en vivo y tiene su botón
+           "Quiero mi cupo" para elegir en qué sala inscribirse. -->
+      <div class="section-head" style="margin-top:40px;">
+        <h2>Salas abiertas</h2>
+        <p>Elige tu sala e inscríbete por <strong>S/3 por jugador</strong>. Los cupos se confirman por WhatsApp con la captura del pago por Yape.</p>
       </div>
+      <div class="rooms-list" id="roomsList"></div>
 
       <!-- ================= MODOS ================= -->
       <section id="modos">
@@ -513,7 +520,7 @@
       <div class="wrap">
         <div class="sub-topbar">
           <div class="a-brand">Torneos <span>Tío LUX</span>
-            <span class="a-tag">Inscripción a la próxima sala</span>
+            <span class="a-tag">Inscripción a la sala elegida</span>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="btn btn-plain btn-small profile-btn hidden" type="button" data-profile-toggle aria-haspopup="dialog">
@@ -526,7 +533,7 @@
       <!-- ================= INSCRIPCIÓN ================= -->
       <section id="inscripcion" style="padding-top:26px;">
         <div class="section-head">
-          <h2>Inscríbete a la próxima sala</h2>
+          <h2 id="regTitle">Inscríbete a la sala elegida</h2>
           <p>Para inscribirte necesitas una cuenta verificada. La página, los modos y los premios se ven sin cuenta; la inscripción sí pide registro e inicio de sesión.</p>
         </div>
 
@@ -854,7 +861,7 @@
           var formato = $("fFormato").value || "podio";
           var data = SUMMARY[formato];
           if (!data) return;
-          $("summaryTitle").textContent = "Te estás inscribiendo en: " + MODO_NAMES[modo] + " · " + FORMATO_NAMES[formato];
+          $("summaryTitle").textContent = "Te estás inscribiendo en: " + NEXT_ROOM.title + " · " + MODO_NAMES[modo] + " · " + FORMATO_NAMES[formato];
           var tb = $("summaryRows");
           tb.innerHTML = "";
           data.rows.forEach(function (r) {
@@ -1023,26 +1030,29 @@
           } catch (e) {}
         }
         /* ---------- Contador en vivo + estado del cupo + perfil ----------
-           liveApproved: resultado del RPC count_approved_inscriptions para la
-           sala actual; si el RPC falla o aún no existe, queda null y el
-           contador usa el número embebido de NEXT_ROOM como respaldo.
+           liveApprovedByRoom: resultado del RPC count_approved_inscriptions
+           por sala (título -> aprobados); si el RPC falla o aún no responde
+           para una sala, esa sala usa su número embebido de ROOMS como
+           respaldo.
            myInscription: la inscripción propia más reciente en la sala
-           actual; myInscriptionState: unknown | none | pendiente | aprobada |
+           elegida; myInscriptionState: unknown | none | pendiente | aprobada |
            rechazada | error. Ante cualquier error se muestra el formulario
            normal: nunca se bloquea la inscripción por una consulta. */
-        var liveApproved = null;
+        var liveApprovedByRoom = {};
         var myInscription = null;
         var myInscriptionState = "unknown";
         var myInscriptionFor = null;
 
         function refreshLiveCounter() {
-          if (!sb) return;
-          sb.rpc("count_approved_inscriptions", { p_sala: NEXT_ROOM.title }).then(function (res) {
-            if (res && !res.error && res.data !== null && res.data !== undefined && isFinite(Number(res.data))) {
-              liveApproved = Math.max(0, Number(res.data));
-              renderAll();
-            }
-          }).catch(function () { /* respaldo: contador embebido */ });
+          if (!sb || typeof ROOMS === "undefined") return;
+          ROOMS.forEach(function (room) {
+            sb.rpc("count_approved_inscriptions", { p_sala: room.title }).then(function (res) {
+              if (res && !res.error && res.data !== null && res.data !== undefined && isFinite(Number(res.data))) {
+                liveApprovedByRoom[room.title] = Math.max(0, Number(res.data));
+                renderAll();
+              }
+            }).catch(function () { /* respaldo: contador embebido */ });
+          });
         }
 
         function checkMyInscription() {
@@ -1051,6 +1061,7 @@
           if (!email) return;
           if (myInscriptionFor === email) { applyInscriptionStatus(); return; }
           myInscriptionFor = email;
+          var salaConsultada = NEXT_ROOM.title;
           sb.from("inscriptions")
             .select("*")
             .eq("correo", email)
@@ -1058,6 +1069,9 @@
             .order("created_at", { ascending: false })
             .limit(1)
             .then(function (res) {
+              /* Si el jugador cambió de sala mientras llegaba la respuesta,
+                 esa respuesta ya no vale: la consulta de la sala nueva manda. */
+              if (salaConsultada !== NEXT_ROOM.title) return;
               if (res && res.error) {
                 myInscription = null;
                 myInscriptionState = "error";
@@ -1069,6 +1083,7 @@
               applyInscriptionStatus();
             })
             .catch(function () {
+              if (salaConsultada !== NEXT_ROOM.title) return;
               myInscription = null;
               myInscriptionState = "error";
               applyInscriptionStatus();
@@ -1345,39 +1360,117 @@
         $("profileClose").addEventListener("click", function () { $("profilePanel").classList.add("hidden"); });
         $("profileLogout").addEventListener("click", function () { $("logoutBtn").click(); });
 
-        /* ---------- Próxima sala (la abierta en el panel del organizador) ---------- */
-        var NEXT_ROOM = {
-          title: "Sala Tio Lux 01",
-          dateText: "sala 15 domingo",
-          timeText: "8:30 p. m.",
-          modo: "solo",
-          formato: "kills",
-          capacity: 48,
-          minPlayers: 36,
-          confirmedPlayers: 0
-        };
-        function approvedPlayers() {
-          return state.regs.filter(function (r) { return r.status === "aprobado"; })
+        /* ---------- Salas abiertas (las del panel del organizador) ----------
+           ROOMS es la lista embebida al publicar: el panel y la página NO se
+           sincronizan solos; al abrir o cerrar una sala en el panel hay que
+           republicar la página. NEXT_ROOM es la sala elegida por el jugador
+           (por defecto la primera): el formulario, la tarjeta de cupo y el
+           contador usan siempre esa sala. */
+        var ROOMS = [
+          {
+            title: "Sala Tio Lux 01",
+            dateText: "sala 15 domingo",
+            timeText: "8:30 p. m.",
+            modo: "solo",
+            formato: "kills",
+            scheme: "solo_kills",
+            capacity: 48,
+            minPlayers: 36,
+            confirmedPlayers: 1
+          },
+          {
+            title: "Tio Lux TODO O NADA",
+            dateText: "Lunes 16 novivembew",
+            timeText: "8:30 p. m.",
+            modo: "escuadra",
+            formato: "ganador",
+            scheme: "ganador",
+            capacity: 48,
+            minPlayers: 36,
+            confirmedPlayers: 0
+          }
+        ];
+        var NEXT_ROOM = ROOMS[0];
+        function approvedPlayers(roomTitle) {
+          return state.regs.filter(function (r) { return r.status === "aprobado" && r.sala === roomTitle; })
             .reduce(function (a, r) { return a + r.players; }, 0);
         }
-        function renderAll() {
-          /* Ocupados: el contador en vivo del RPC si ya respondió; si no,
-             el número embebido de la sala como respaldo. */
-          var base = liveApproved !== null ? liveApproved : NEXT_ROOM.confirmedPlayers;
-          var ap = base + approvedPlayers();
-          $("cuposNum").textContent = ap;
-          $("cuposBar").style.width = Math.min(100, ap / NEXT_ROOM.capacity * 100) + "%";
-          $("cuposMsg").textContent = ap >= NEXT_ROOM.capacity
-            ? "¡Sala llena! Escríbenos por WhatsApp para entrar a la lista de espera de la siguiente sala."
-            : "Van " + ap + " de " + NEXT_ROOM.capacity + " cupos confirmados. La sala se juega al llegar a " + NEXT_ROOM.minPlayers + " jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
+        function roomPrizeLine(room) {
+          if (room.formato === "kills") return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Premios hasta el 5.° puesto + <b>S/1 por kill</b> · Inscripción <b>S/3</b> por jugador";
+          if (room.formato === "ganador") return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Solo Ganador: 1.° puesto <b>S/100</b> (por equipo) · Inscripción <b>S/3</b> por jugador";
+          return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Podio: 1.° S/60 · 2.° S/30 · 3.° S/10 (por equipo) · Inscripción <b>S/3</b> por jugador";
         }
-        /* "Quiero mi cupo": abre la inscripción con el modo de esta sala ya elegido */
-        $("cupoBtn").addEventListener("click", function () {
-          $("fModo").value = NEXT_ROOM.modo;
+        function buildRooms() {
+          var list = $("roomsList");
+          if (!list || list.childNodes.length) return;
+          ROOMS.forEach(function (room, i) {
+            var card = document.createElement("div");
+            card.className = "cupos" + (room === NEXT_ROOM ? " selected" : "");
+            card.setAttribute("role", "status");
+            card.setAttribute("aria-live", "polite");
+            card.setAttribute("data-room", String(i));
+            card.innerHTML =
+              '<div class="cupos-top">' +
+                '<span class="label"><span class="live-dot"></span>Sala abierta <span class="picked-badge">· Sala elegida</span></span>' +
+                '<span class="count"><span id="cuposNum-' + i + '">0</span> <small>/ ' + room.capacity + ' jugadores</small></span>' +
+              "</div>" +
+              '<div class="room-name">' + esc(room.title) + ' <span class="room-when">— ' + esc(room.dateText) + " · " + esc(room.timeText) + "</span></div>" +
+              '<p class="room-mode">' + roomPrizeLine(room) + "</p>" +
+              '<div class="bar"><i id="cuposBar-' + i + '"></i></div>' +
+              '<p id="cuposMsg-' + i + '"></p>' +
+              '<a class="btn btn-accent" href="#inscripcion" data-room-pick="' + i + '">Quiero mi cupo</a>';
+            list.appendChild(card);
+          });
+          list.addEventListener("click", function (e) {
+            var btn = e.target.closest ? e.target.closest("[data-room-pick]") : null;
+            if (!btn) return;
+            selectRoom(ROOMS[Number(btn.getAttribute("data-room-pick"))]);
+          });
+        }
+        /* "Quiero mi cupo" de una tarjeta: esa sala pasa a ser la elegida y
+           el formulario, el resumen y la tarjeta de cupo usan esa sala. */
+        function selectRoom(room) {
+          if (!room) return;
+          var changed = room !== NEXT_ROOM;
+          NEXT_ROOM = room;
+          if (changed) {
+            myInscriptionFor = null;
+            myInscription = null;
+            myInscriptionState = "unknown";
+          }
+          applyRoomToForm(room);
+          document.querySelectorAll("#roomsList .cupos").forEach(function (card) {
+            card.classList.toggle("selected", ROOMS[Number(card.getAttribute("data-room"))] === room);
+          });
+          renderAll();
+          /* Mientras llega la consulta de la sala nueva, no dejar visible la
+             tarjeta de cupo de la sala anterior. */
+          if (changed) applyInscriptionStatus();
+          if (changed && currentUser && isVerified(currentUser)) checkMyInscription();
+        }
+        function applyRoomToForm(room) {
+          $("fModo").value = room.modo;
           fillFormats(false);
-          $("fFormato").value = NEXT_ROOM.formato;
+          $("fFormato").value = room.formato;
           updateTeamBlocks();
-        });
+          var rt = $("regTitle");
+          if (rt) rt.textContent = "Inscríbete a la " + room.title;
+        }
+        function renderAll() {
+          buildRooms();
+          /* Ocupados por sala: el contador en vivo del RPC si ya respondió;
+             si no, el número embebido de esa sala como respaldo. */
+          ROOMS.forEach(function (room, i) {
+            var base = liveApprovedByRoom[room.title] !== undefined ? liveApprovedByRoom[room.title] : room.confirmedPlayers;
+            var ap = base + approvedPlayers(room.title);
+            var num = $("cuposNum-" + i), bar = $("cuposBar-" + i), msg = $("cuposMsg-" + i);
+            if (num) num.textContent = ap;
+            if (bar) bar.style.width = Math.min(100, ap / room.capacity * 100) + "%";
+            if (msg) msg.textContent = ap >= room.capacity
+              ? "¡Sala llena! Escríbenos por WhatsApp para entrar a la lista de espera de la siguiente sala."
+              : "Van " + ap + " de " + room.capacity + " cupos confirmados. La sala se juega al llegar a " + room.minPlayers + " jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
+          });
+        }
 
         /* ---------- Envío del formulario ---------- */
         function showError(msg) {
@@ -1467,7 +1560,7 @@
             if (!saved) $("saveWarning").classList.add("show");
 
             state.regs.push({
-              id: ++seq, nick: nick, gameId: gid, modo: MODO_NAMES[modo],
+              id: ++seq, nick: nick, gameId: gid, sala: NEXT_ROOM.title, modo: MODO_NAMES[modo],
               formato: FORMATO_NAMES[formato], players: n, status: "pendiente",
               extra: modo === "duo" && choice === "tengo" ? "Dúo: " + duoNick + " (ID: " + duoId + ")"
                 : modo === "duo" ? "Dúo aleatorio"
@@ -1544,6 +1637,7 @@
         $("backToPublicReg").addEventListener("click", goPublic);
 
         fillFormats(false);
+        applyRoomToForm(NEXT_ROOM);
         applyRoute();
         renderAll();
         refreshLiveCounter();
