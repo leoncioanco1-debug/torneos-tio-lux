@@ -388,6 +388,18 @@
       .room-keys .k-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; margin-top: 6px; }
       .room-keys .k-label:first-child { margin-top: 0; }
       .room-keys .k-value { font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 1.4rem; line-height: 1.15; }
+
+      /* ---------- Mis cupos (inicio, solo con sesión verificada) ---------- */
+      .my-cupo { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px; display: grid; gap: 8px; align-content: start; }
+      .my-cupo h3 { font-size: 1.3rem; text-transform: uppercase; }
+      .my-cupo p { margin: 0; }
+      .my-cupo.approved { border-color: var(--ok); }
+      .my-cupo.rejected { border-color: var(--danger); }
+      .cupo-pill { display: inline-block; font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; border: 1px solid; white-space: nowrap; }
+      .cupo-pill.ok { color: var(--ok); border-color: var(--ok); background: var(--surface-2); }
+      .cupo-pill.pending { color: #8a5a00; border-color: #d9a441; background: #fdf3e0; }
+      @media (prefers-color-scheme: dark) { .cupo-pill.pending { color: #ffd88a; border-color: #8a6a1f; background: #33270d; } }
+      .cupo-pill.bad { color: var(--danger); border-color: var(--danger); background: var(--surface-2); }
     </style>
   </head>
   <body>
@@ -432,6 +444,17 @@
         <p>Elige tu sala e inscríbete por <strong>S/3 por jugador</strong>. Los cupos se confirman por WhatsApp con la captura del pago por Yape.</p>
       </div>
       <div class="rooms-list" id="roomsList"></div>
+
+      <!-- Mis cupos: solo se muestra con sesión verificada. Lo rellena el
+           script con las inscripciones propias del jugador en Supabase. -->
+      <section id="myCuposSection" class="hidden" aria-live="polite" style="margin-bottom:44px;">
+        <div class="section-head" style="margin-bottom:16px;">
+          <h2>Mis cupos</h2>
+          <p id="myCuposSummary">Tienes 0 cupos.</p>
+        </div>
+        <div class="rooms-list" id="myCuposList" style="margin:0;"></div>
+        <p id="myCuposEmpty" class="fineprint hidden">Aún no tienes cupos.</p>
+      </section>
 
       <!-- ================= MODOS ================= -->
       <section id="modos">
@@ -1153,6 +1176,101 @@
             '<a class="btn btn-wa" href="https://wa.me/' + WA_NUMBER + '" target="_blank" rel="noopener">Enviar mi captura por WhatsApp</a>';
         }
 
+        /* ---------- Mis cupos (inicio, solo con sesión verificada) ----------
+           Lista TODAS las inscripciones propias del jugador (correo = su
+           email), más recientes primero. La política RLS SELECT propia
+           permite leer solo sus filas. Si la consulta falla, el apartado
+           se oculta sin bloquear nada: la inscripción sigue funcionando. */
+        var myCupos = [];
+        var myCuposFor = null;
+
+        function myCuposSummaryText(rows) {
+          var salas = {};
+          rows.forEach(function (r) { salas[r.sala || ""] = true; });
+          var n = rows.length, y = Object.keys(salas).length;
+          return "Tienes " + n + (n === 1 ? " cupo" : " cupos") + " en " + y + (y === 1 ? " sala" : " salas");
+        }
+
+        function myCupoItemHtml(row) {
+          var estado = String(row.estado || "").toLowerCase();
+          var pill, cls, detail;
+          var when = [row.fecha, row.hora].filter(Boolean).join(" · ");
+          var meta = [row.modo, row.formato].filter(Boolean).join(" · ");
+          if (estado === "aprobada") {
+            pill = '<span class="cupo-pill ok">Aprobada</span>';
+            cls = "approved";
+            if (row.room_id || row.room_password) {
+              detail = '<div class="room-keys">' +
+                (row.room_id ? '<span class="k-label">ID de la sala</span><span class="k-value">' + esc(row.room_id) + "</span>" : "") +
+                (row.room_password ? '<span class="k-label">Clave de la sala</span><span class="k-value">' + esc(row.room_password) + "</span>" : "") +
+                "</div>";
+            } else {
+              detail = "<p><b>ID y clave de la sala:</b> El Tío LUX te enviará el ID y la clave por WhatsApp.</p>";
+            }
+            detail += "<p>Ya estás activado, solo espera hasta el " + esc(row.fecha || "") + " a las " + esc(row.hora || "") + " cuando se juega.</p>";
+          } else if (estado === "rechazada") {
+            pill = '<span class="cupo-pill bad">Rechazada</span>';
+            cls = "rejected";
+            detail = "<p>Esta inscripción fue rechazada. Si crees que es un error, escríbele al Tío LUX por WhatsApp.</p>";
+          } else {
+            pill = '<span class="cupo-pill pending">Pendiente de aprobación</span>';
+            cls = "";
+            detail = "<p>Tu inscripción está pendiente de aprobación. Para que el Tío LUX la apruebe, mándale la captura de tu pago por Yape por WhatsApp.</p>" +
+              '<a class="btn btn-wa btn-small" href="https://wa.me/' + WA_NUMBER + '" target="_blank" rel="noopener">Enviar mi captura por WhatsApp</a>';
+          }
+          return '<article class="my-cupo ' + cls + '">' +
+            "<h3>" + esc(row.sala || "Sala") + pill + "</h3>" +
+            (when ? "<p><b>" + esc(when) + "</b></p>" : "") +
+            (meta ? "<p>" + esc(meta) + "</p>" : "") +
+            detail +
+            "</article>";
+        }
+
+        function renderMyCupos(rows) {
+          var section = $("myCuposSection"), list = $("myCuposList"),
+              summary = $("myCuposSummary"), empty = $("myCuposEmpty");
+          if (!section || !list || !summary || !empty) return;
+          myCupos = rows || [];
+          section.classList.remove("hidden");
+          summary.textContent = myCuposSummaryText(myCupos);
+          if (!myCupos.length) {
+            list.innerHTML = "";
+            empty.classList.remove("hidden");
+            return;
+          }
+          empty.classList.add("hidden");
+          list.innerHTML = myCupos.map(myCupoItemHtml).join("");
+        }
+
+        function loadMyCupos() {
+          var section = $("myCuposSection");
+          if (!sb || !currentUser || !isVerified(currentUser)) {
+            if (section) section.classList.add("hidden");
+            return;
+          }
+          var email = currentUser.email || "";
+          if (!email) {
+            if (section) section.classList.add("hidden");
+            return;
+          }
+          if (myCuposFor === email) { renderMyCupos(myCupos); return; }
+          myCuposFor = email;
+          sb.from("inscriptions")
+            .select("*")
+            .eq("correo", email)
+            .order("created_at", { ascending: false })
+            .then(function (res) {
+              if (res && res.error) {
+                if (section) section.classList.add("hidden");
+                return;
+              }
+              renderMyCupos((res && res.data) || []);
+            })
+            .catch(function () {
+              if (section) section.classList.add("hidden");
+            });
+        }
+
         function fillProfile() {
           if (!currentUser) return;
           var meta = currentUser.user_metadata || {};
@@ -1205,6 +1323,7 @@
             if (meta.ff_id) $("fId").value = meta.ff_id;
             fillProfile();
             checkMyInscription();
+            loadMyCupos();
           } else {
             if (currentUser && !verified) {
               /* Sesión sin verificar: no habilita la inscripción */
@@ -1217,6 +1336,10 @@
             document.querySelectorAll(".profile-btn").forEach(function (b) { b.classList.add("hidden"); });
             $("profilePanel").classList.add("hidden");
             $("cupoStatusCard").classList.add("hidden");
+            var myCuposSection = $("myCuposSection");
+            if (myCuposSection) myCuposSection.classList.add("hidden");
+            myCupos = [];
+            myCuposFor = null;
             myInscription = null;
             myInscriptionState = "unknown";
             myInscriptionFor = null;
@@ -1558,6 +1681,9 @@
           function finishInscription(saved) {
             if (submitBtn) submitBtn.disabled = false;
             if (!saved) $("saveWarning").classList.add("show");
+            /* La lista de "Mis cupos" quedó desactualizada: que la próxima
+               vez que se vea el inicio vuelva a consultar Supabase. */
+            myCuposFor = null;
 
             state.regs.push({
               id: ++seq, nick: nick, gameId: gid, sala: NEXT_ROOM.title, modo: MODO_NAMES[modo],
@@ -1618,6 +1744,11 @@
           $("registerView").classList.toggle("hidden", view !== "register");
           document.title = view === "register" ? REG_TITLE : PUBLIC_TITLE;
           if (view !== currentView) { window.scrollTo(0, 0); currentView = view; }
+          if (view === "public") {
+            /* Al volver al inicio con sesión verificada, "Mis cupos" se
+               refresca (usa la caché por correo si no cambió nada). */
+            loadMyCupos();
+          }
           if (view === "register") {
             /* La vista acaba de hacerse visible: es el momento seguro para
                crear los captchas (antes estaban en un contenedor oculto). */
