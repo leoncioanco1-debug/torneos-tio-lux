@@ -436,9 +436,11 @@
 
     <div class="wrap">
       <!-- Salas abiertas: las que el organizador tiene abiertas en su panel.
-           Las tarjetas se generan desde la lista ROOMS embebida en el script;
-           cada una consulta su propio contador en vivo y tiene su botón
-           "Quiero mi cupo" para elegir en qué sala inscribirse. -->
+           Las tarjetas se generan desde public.rooms en Supabase (solo
+           estado 'abierta'); si esa lectura falla, se usa la lista ROOMS
+           embebida en el script como respaldo. Cada una consulta su
+           propio contador en vivo y tiene su botón "Quiero mi cupo" para
+           elegir en qué sala inscribirse. -->
       <div class="section-head" style="margin-top:40px;">
         <h2>Salas abiertas</h2>
         <p>Elige tu sala e inscríbete por <strong>S/3 por jugador</strong>. Los cupos se confirman por WhatsApp con la captura del pago por Yape.</p>
@@ -1486,11 +1488,13 @@
         $("profileLogout").addEventListener("click", function () { $("logoutBtn").click(); });
 
         /* ---------- Salas abiertas (las del panel del organizador) ----------
-           ROOMS es la lista embebida al publicar: el panel y la página NO se
-           sincronizan solos; al abrir o cerrar una sala en el panel hay que
-           republicar la página. NEXT_ROOM es la sala elegida por el jugador
-           (por defecto la primera): el formulario, la tarjeta de cupo y el
-           contador usan siempre esa sala. */
+           ROOMS es la lista embebida al publicar: RESPALDO si la lectura
+           en vivo de Supabase (loadRoomsFromSupabase, más abajo) falla.
+           Al cargar, la página lee public.rooms (solo estado 'abierta')
+           y reemplaza esta lista con las salas reales del panel, sin
+           necesidad de republicar. NEXT_ROOM es la sala elegida por el
+           jugador (por defecto la primera): el formulario, la tarjeta
+           de cupo y el contador usan siempre esa sala. */
         /* Lista vaciada el 2026-11-12 tras el borrado total en el panel del
            organizador: al abrir una sala nueva hay que republicar con la
            lista actualizada. */
@@ -1512,14 +1516,32 @@
           return state.regs.filter(function (r) { return r.status === "aprobado" && r.sala === roomTitle; })
             .reduce(function (a, r) { return a + r.players; }, 0);
         }
+        /* Premios de la sala: usa los montos de la fila de Supabase cuando
+           la sala los trae (premio_primero..premio_quinto, premio_por_kill);
+           la lista ROOMS embebida no los trae y cae en los valores de
+           siempre (podio 60/30/10, ganador 100, kills hasta el 5.° + S/1). */
+        function prizeOr(v, d) { return (typeof v === "number" && isFinite(v)) ? v : d; }
         function roomPrizeLine(room) {
-          if (room.formato === "kills") return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Premios hasta el 5.° puesto + <b>S/1 por kill</b> · Inscripción <b>S/3</b> por jugador";
-          if (room.formato === "ganador") return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Solo Ganador: 1.° puesto <b>S/100</b> (por equipo) · Inscripción <b>S/3</b> por jugador";
-          return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Podio: 1.° S/60 · 2.° S/30 · 3.° S/10 (por equipo) · Inscripción <b>S/3</b> por jugador";
+          var price = prizeOr(room.precioInscripcion, 3);
+          if (room.formato === "kills") {
+            var places = [room.premioPrimero, room.premioSegundo, room.premioTercero, room.premioCuarto, room.premioQuinto];
+            var hasPrizes = places.some(function (p) { return typeof p === "number" && isFinite(p); });
+            if (hasPrizes) {
+              var parts = places.map(function (p, i) {
+                return (i + 1) + ".° S/" + (typeof p === "number" && isFinite(p) ? p : 0);
+              }).join(" · ");
+              return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Premios: " + parts + " + <b>S/" + prizeOr(room.premioPorKill, 1) + " por kill</b> · Inscripción <b>S/" + price + "</b> por jugador";
+            }
+            return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Premios hasta el 5.° puesto + <b>S/1 por kill</b> · Inscripción <b>S/" + price + "</b> por jugador";
+          }
+          if (room.formato === "ganador") return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Solo Ganador: 1.° puesto <b>S/" + prizeOr(room.premioPrimero, 100) + "</b> (por equipo) · Inscripción <b>S/" + price + "</b> por jugador";
+          return "Modo <b>" + MODO_NAMES[room.modo] + "</b> · Podio: 1.° S/" + prizeOr(room.premioPrimero, 60) + " · 2.° S/" + prizeOr(room.premioSegundo, 30) + " · 3.° S/" + prizeOr(room.premioTercero, 10) + " (por equipo) · Inscripción <b>S/" + price + "</b> por jugador";
         }
-        function buildRooms() {
+        function buildRooms(force) {
           var list = $("roomsList");
-          if (!list || list.childNodes.length) return;
+          if (!list) return;
+          if (list.childNodes.length && !force) return;
+          list.innerHTML = "";
           if (!ROOMS.length) {
             var empty = document.createElement("p");
             empty.className = "fineprint";
@@ -1545,11 +1567,16 @@
               '<a class="btn btn-accent" href="#inscripcion" data-room-pick="' + i + '">Quiero mi cupo</a>';
             list.appendChild(card);
           });
-          list.addEventListener("click", function (e) {
-            var btn = e.target.closest ? e.target.closest("[data-room-pick]") : null;
-            if (!btn) return;
-            selectRoom(ROOMS[Number(btn.getAttribute("data-room-pick"))]);
-          });
+          /* El listener vive en la lista (delegado): sobrevive a los
+             rebuilds, así que se ata una sola vez. */
+          if (!list.dataset.roomsBound) {
+            list.dataset.roomsBound = "1";
+            list.addEventListener("click", function (e) {
+              var btn = e.target.closest ? e.target.closest("[data-room-pick]") : null;
+              if (!btn) return;
+              selectRoom(ROOMS[Number(btn.getAttribute("data-room-pick"))]);
+            });
+          }
         }
         /* "Quiero mi cupo" de una tarjeta: esa sala pasa a ser la elegida y
            el formulario, el resumen y la tarjeta de cupo usan esa sala. */
@@ -1595,6 +1622,83 @@
               ? "¡Sala llena! Escríbenos por WhatsApp para entrar a la lista de espera de la siguiente sala."
               : "Van " + ap + " de " + room.capacity + " cupos confirmados. La sala se juega al llegar a " + room.minPlayers + " jugadores confirmados. Las inscripciones se confirman por WhatsApp con la captura del pago; al aprobarse, el cupo se suma aquí.";
           });
+        }
+
+        /* ---------- Salas en vivo desde Supabase (FASE 2) ----------
+           Al cargar, la página lee public.rooms con la clave anon: solo
+           salas con estado 'abierta', columnas pedidas POR NOMBRE y NUNCA
+           select=* (la columna clave_sala no es legible con anon y un
+           SELECT * fallaría por falta de permiso en esa columna). Cada
+           fila se mapea al formato ROOMS que la página ya usa, incluidos
+           los premios (podio 60/30/10, ganador primero 100, kills puestos
+           1-5 + S/1 por kill). Si la lectura falla, la página sigue con
+           la lista ROOMS embebida como respaldo y no se rompe nada.
+           La clave/ID de la sala para jugadores aprobados NO se lee de
+           aquí: llega por inscriptions.room_id / room_password. */
+        var ROOMS_COLUMNS = "panel_id,titulo,fecha,hora,modo,formato,capacidad,minimo_jugadores,precio_inscripcion,premio_primero,premio_segundo,premio_tercero,premio_cuarto,premio_quinto,premio_por_kill,id_sala,estado";
+        function mapRoomRow(r) {
+          return {
+            title: r.titulo,
+            dateText: r.fecha,
+            timeText: r.hora,
+            modo: r.modo,
+            formato: r.formato,
+            scheme: r.formato,
+            capacity: Number(r.capacidad) || 48,
+            minPlayers: Number(r.minimo_jugadores) || 0,
+            confirmedPlayers: 0,
+            precioInscripcion: Number(r.precio_inscripcion) || 3,
+            premioPrimero: r.premio_primero,
+            premioSegundo: r.premio_segundo,
+            premioTercero: r.premio_tercero,
+            premioCuarto: r.premio_cuarto,
+            premioQuinto: r.premio_quinto,
+            premioPorKill: r.premio_por_kill
+          };
+        }
+        function loadRoomsFromSupabase() {
+          if (!sb) return;
+          sb.from("rooms")
+            .select(ROOMS_COLUMNS)
+            .eq("estado", "abierta")
+            .order("created_at", { ascending: true })
+            .then(function (res) {
+              if (res && res.error) {
+                console.warn("No se pudieron leer las salas en vivo; se muestra la lista embebida:", res.error.message || res.error);
+                return;
+              }
+              var rows = (res && res.data) || [];
+              var prevTitle = NEXT_ROOM ? NEXT_ROOM.title : null;
+              var mapped = rows.map(mapRoomRow).filter(function (room) {
+                return room.title && room.dateText && room.timeText;
+              });
+              ROOMS.length = 0;
+              mapped.forEach(function (room) { ROOMS.push(room); });
+              var kept = null;
+              if (prevTitle) {
+                ROOMS.forEach(function (room) { if (room.title === prevTitle) kept = room; });
+              }
+              var changed = kept !== NEXT_ROOM;
+              NEXT_ROOM = kept || ROOMS[0] || null;
+              if (changed) {
+                myInscriptionFor = null;
+                myInscription = null;
+                myInscriptionState = "unknown";
+              }
+              if (NEXT_ROOM) {
+                applyRoomToForm(NEXT_ROOM);
+              } else {
+                var rt = $("regTitle");
+                if (rt) rt.textContent = "Inscríbete";
+              }
+              buildRooms(true);
+              renderAll();
+              if (changed) applyInscriptionStatus();
+              refreshLiveCounter();
+            })
+            .catch(function (err) {
+              console.warn("No se pudieron leer las salas en vivo; se muestra la lista embebida:", err);
+            });
         }
 
         /* ---------- Envío del formulario ---------- */
@@ -1775,6 +1879,7 @@
         applyRoute();
         renderAll();
         refreshLiveCounter();
+        loadRoomsFromSupabase();
       })();
     </script>
   </body>
