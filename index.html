@@ -880,6 +880,7 @@
           }
         };
         function updateSummary() {
+          if (!NEXT_ROOM) return;
           var modo = $("fModo").value;
           var formato = $("fFormato").value || "podio";
           var data = SUMMARY[formato];
@@ -1079,6 +1080,7 @@
         }
 
         function checkMyInscription() {
+          if (!NEXT_ROOM) return;
           if (!sb || !currentUser || !isVerified(currentUser)) return;
           var email = currentUser.email || "";
           if (!email) return;
@@ -1489,31 +1491,11 @@
            republicar la página. NEXT_ROOM es la sala elegida por el jugador
            (por defecto la primera): el formulario, la tarjeta de cupo y el
            contador usan siempre esa sala. */
-        var ROOMS = [
-          {
-            title: "Sala Tio Lux 01",
-            dateText: "sala 15 domingo",
-            timeText: "8:30 p. m.",
-            modo: "solo",
-            formato: "kills",
-            scheme: "solo_kills",
-            capacity: 48,
-            minPlayers: 36,
-            confirmedPlayers: 1
-          },
-          {
-            title: "Tio Lux TODO O NADA",
-            dateText: "Lunes 16 novivembew",
-            timeText: "8:30 p. m.",
-            modo: "escuadra",
-            formato: "ganador",
-            scheme: "ganador",
-            capacity: 48,
-            minPlayers: 36,
-            confirmedPlayers: 0
-          }
-        ];
-        var NEXT_ROOM = ROOMS[0];
+        /* Lista vaciada el 2026-11-12 tras el borrado total en el panel del
+           organizador: al abrir una sala nueva hay que republicar con la
+           lista actualizada. */
+        var ROOMS = [];
+        var NEXT_ROOM = ROOMS[0] || null;
         function approvedPlayers(roomTitle) {
           return state.regs.filter(function (r) { return r.status === "aprobado" && r.sala === roomTitle; })
             .reduce(function (a, r) { return a + r.players; }, 0);
@@ -1526,6 +1508,13 @@
         function buildRooms() {
           var list = $("roomsList");
           if (!list || list.childNodes.length) return;
+          if (!ROOMS.length) {
+            var empty = document.createElement("p");
+            empty.className = "fineprint";
+            empty.textContent = "No hay salas abiertas por ahora. Vuelve pronto: el Tío LUX abre nuevas salas cada día.";
+            list.appendChild(empty);
+            return;
+          }
           ROOMS.forEach(function (room, i) {
             var card = document.createElement("div");
             card.className = "cupos" + (room === NEXT_ROOM ? " selected" : "");
@@ -1572,6 +1561,7 @@
           if (changed && currentUser && isVerified(currentUser)) checkMyInscription();
         }
         function applyRoomToForm(room) {
+          if (!room) return;
           $("fModo").value = room.modo;
           fillFormats(false);
           $("fFormato").value = room.formato;
@@ -1611,6 +1601,7 @@
             $("authCard").scrollIntoView({ behavior: "smooth", block: "start" });
             return showError("Inicia sesión con una cuenta verificada para inscribirte. Primero crea tu cuenta, confirma tu correo y luego inicia sesión.");
           }
+          if (!NEXT_ROOM) return showError("No hay salas abiertas por ahora. Vuelve cuando el Tío LUX abra una nueva sala.");
           var email = currentUser.email || "";
           var nick = $("fNick").value.trim();
           var gid = $("fId").value.trim();
