@@ -154,6 +154,12 @@
       .btn-plain { background: var(--surface-2); color: var(--ink); border-color: var(--line); }
       .btn-plain:hover { border-color: var(--accent); color: var(--accent-strong); }
       .btn-small { min-height: 40px; padding: 8px 14px; font-size: 0.95rem; }
+      /* Botón de estado de una tarjeta de sala: NO es un enlace ni abre
+         el formulario, solo muestra el estado del jugador en esa sala. */
+      .btn-state { cursor: default; }
+      .btn-state.approved { color: var(--ok); border-color: var(--ok); background: var(--surface-2); }
+      .btn-state.pending { color: #8a5a00; border-color: #d9a441; background: #fdf3e0; }
+      @media (prefers-color-scheme: dark) { .btn-state.pending { color: #ffd88a; border-color: #8a6a1f; background: #33270d; } }
       .btn svg { flex: none; }
 
       /* Cupos counter */
@@ -446,8 +452,10 @@
            Las tarjetas se generan desde public.rooms en Supabase (solo
            estado 'abierta'); si esa lectura falla, se usa la lista ROOMS
            embebida en el script como respaldo. Cada una consulta su
-           propio contador en vivo y tiene su botón "Quiero mi cupo" para
-           elegir en qué sala inscribirse. -->
+           propio contador en vivo y su botón muestra el estado del
+           jugador en esa sala: "Quiero mi cupo" si no tiene inscripción
+           activa, "Tu cupo está aprobado" o "Pendiente de aprobación"
+           si ya tiene cupo (ese botón no abre el formulario). -->
       <div class="section-head" style="margin-top:40px;">
         <h2>Salas abiertas</h2>
         <p>Elige tu sala e inscríbete por <strong>S/3 por jugador</strong>. Los cupos se confirman por WhatsApp con la captura del pago por Yape.</p>
@@ -576,23 +584,13 @@
 
           <div id="authLoading"><p class="fineprint">Comprobando tu sesión…</p></div>
 
-          <!-- Iframe oculto para el gestor de contraseñas: los formularios de
-               jugador se autentican solo por JS (Supabase Auth) y el handler
-               usa preventDefault, así que el navegador nunca ve un envío real
-               y Safari no ofrece guardar la contraseña. Tras una autenticación
-               correcta el handler hace form.submit() hacia este iframe: es un
-               envío real (POST a esta misma página, que GitHub Pages responde
-               405 dentro del iframe) sin navegar la página ni re-disparar el
-               evento submit. -->
-          <iframe name="save-creds-frame" id="saveCredsFrame" aria-hidden="true" tabindex="-1" style="position:absolute;width:0;height:0;border:0;visibility:hidden;"></iframe>
-
           <div id="authLoggedOut" class="hidden">
             <div class="auth-tabs" role="tablist" aria-label="Cuenta de jugador">
               <button type="button" class="auth-tab active" id="tabSignup">Crear cuenta</button>
               <button type="button" class="auth-tab" id="tabLogin">Iniciar sesión</button>
             </div>
 
-            <form id="signupForm" method="post" target="save-creds-frame" novalidate>
+            <form id="signupForm" method="post" novalidate>
               <div class="form-grid">
                 <div class="half">
                   <label class="field"><span>Usuario</span>
@@ -638,7 +636,7 @@
               </div>
             </form>
 
-            <form id="loginForm" method="post" target="save-creds-frame" class="hidden" novalidate>
+            <form id="loginForm" method="post" class="hidden" novalidate>
               <div class="form-grid">
                 <label class="field"><span>Correo electrónico</span>
                   <input type="email" id="liEmail" name="email" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
@@ -1085,6 +1083,14 @@
         var myInscription = null;
         var myInscriptionState = "unknown";
         var myInscriptionFor = null;
+        /* Estado propio por sala (título -> aprobada | pendiente |
+           rechazada | none | error): lo usa el botón de cada tarjeta en
+           "Salas abiertas". Se llena con loadMyRoomStates al iniciar
+           sesión y se sincroniza con checkMyInscription. Sin sesión o
+           antes de cargar, el mapa está vacío y los botones quedan como
+           "Quiero mi cupo" (nunca se bloquea por falta de datos). */
+        var myStateByRoom = {};
+        var myStateByRoomFor = null;
 
         function refreshLiveCounter() {
           if (!sb || typeof ROOMS === "undefined") return;
@@ -1112,12 +1118,19 @@
           if (!force && myInscriptionFor === cacheKey) { applyInscriptionStatus(); return; }
           myInscriptionFor = cacheKey;
           var salaConsultada = NEXT_ROOM.title;
+          /* Se leen TODAS las filas propias de esa sala (sin limit(1)):
+             un jugador puede tener varias (una aprobada y duplicados
+             rechazados después), y el estado NO es el de la fila más
+             reciente: manda la mejor inscripción activa, aprobada antes
+             que pendiente. Una rechazada no anula una aprobada ni una
+             pendiente. Antes se tomaba solo la fila más reciente y una
+             rechazada nueva tapaba la aprobada, así que el formulario
+             seguía apareciendo aunque el cupo ya estaba aprobado. */
           sb.from("inscriptions")
             .select("*")
             .eq("correo", email)
             .eq("sala", NEXT_ROOM.title)
             .order("created_at", { ascending: false })
-            .limit(1)
             .then(function (res) {
               /* Si el jugador cambió de sala mientras llegaba la respuesta,
                  esa respuesta ya no vale: la consulta de la sala nueva manda. */
@@ -1127,9 +1140,23 @@
                 myInscriptionState = "error";
               } else {
                 var rows = (res && res.data) || [];
-                myInscription = rows.length ? rows[0] : null;
-                myInscriptionState = myInscription ? String(myInscription.estado || "").toLowerCase() : "none";
+                myInscription = null;
+                myInscriptionState = "none";
+                rows.forEach(function (r) {
+                  var st = String(r.estado || "").toLowerCase();
+                  if (st === "aprobada" && myInscriptionState !== "aprobada") {
+                    myInscription = r;
+                    myInscriptionState = "aprobada";
+                  } else if (st === "pendiente" && myInscriptionState === "none") {
+                    myInscription = r;
+                    myInscriptionState = "pendiente";
+                  }
+                });
+                /* Sin activa (solo rechazadas o ninguna), myInscription
+                   queda en null y el estado en "none": el jugador puede
+                   reinscribirse y el formulario se muestra normal. */
               }
+              syncRoomState(salaConsultada, myInscriptionState);
               applyInscriptionStatus();
             })
             .catch(function () {
@@ -1203,11 +1230,66 @@
             '<a class="btn btn-wa" href="https://wa.me/' + WA_NUMBER + '" target="_blank" rel="noopener">Enviar mi captura por WhatsApp</a>';
         }
 
+        /* ---------- Estado propio por sala (botón de cada tarjeta) ----------
+           myStateByRoom guarda el estado del jugador en CADA sala abierta,
+           con la misma prioridad que checkMyInscription (aprobada antes
+           que pendiente; una rechazada no anula una activa). Cuando el
+           estado de una sala cambia, las tarjetas se reconstruyen para
+           que su botón muestre el estado nuevo. */
+        function syncRoomState(title, state) {
+          if (!title || !state) return;
+          if (myStateByRoom[title] === state) return;
+          myStateByRoom[title] = state;
+          buildRooms(true);
+          renderAll();
+        }
+
+        function roomCtaHtml(room, i) {
+          var st = myStateByRoom[room.title];
+          if (st === "aprobada") return '<span class="btn btn-state approved" role="status">Tu cupo está aprobado</span>';
+          if (st === "pendiente") return '<span class="btn btn-state pending" role="status">Pendiente de aprobación</span>';
+          /* Sin inscripción, rechazada, error o aún sin cargar: el botón
+             normal que abre el formulario. Nunca se bloquea la inscripción
+             por falta de datos. */
+          return '<a class="btn btn-accent" href="#inscripcion" data-room-pick="' + i + '">Quiero mi cupo</a>';
+        }
+
+        function loadMyRoomStates(force) {
+          if (!sb || !currentUser || !isVerified(currentUser)) return;
+          var email = currentUser.email || "";
+          if (!email) return;
+          if (!force && myStateByRoomFor === email) { buildRooms(true); renderAll(); return; }
+          myStateByRoomFor = email;
+          sb.from("inscriptions")
+            .select("sala,estado")
+            .eq("correo", email)
+            .order("created_at", { ascending: false })
+            .then(function (res) {
+              if (res && res.error) return;
+              var rows = (res && res.data) || [];
+              var map = {};
+              rows.forEach(function (r) {
+                var st = String(r.estado || "").toLowerCase();
+                var prev = map[r.sala];
+                if (st === "aprobada") map[r.sala] = "aprobada";
+                else if (st === "pendiente" && prev !== "aprobada") map[r.sala] = "pendiente";
+                else if (!prev) map[r.sala] = st;
+              });
+              var changed = JSON.stringify(map) !== JSON.stringify(myStateByRoom);
+              myStateByRoom = map;
+              if (changed) { buildRooms(true); renderAll(); }
+            })
+            .catch(function () { /* sin estado por sala: los botones quedan como "Quiero mi cupo" */ });
+        }
+
         /* ---------- Mis cupos (inicio, solo con sesión verificada) ----------
-           Lista TODAS las inscripciones propias del jugador (correo = su
-           email), más recientes primero. La política RLS SELECT propia
-           permite leer solo sus filas. Si la consulta falla, el apartado
-           se oculta sin bloquear nada: la inscripción sigue funcionando. */
+           Lista las inscripciones propias del jugador (correo = su
+           email), más recientes primero, SIN las rechazadas: una
+           rechazada es una inscripción vieja que ya no vale y solo
+           confunde (el jugador puede inscribirse de nuevo a esa sala).
+           La política RLS SELECT propia permite leer solo sus filas.
+           Si la consulta falla, el apartado se oculta sin bloquear
+           nada: la inscripción sigue funcionando. */
         var myCupos = [];
         var myCuposFor = null;
 
@@ -1257,7 +1339,11 @@
           var section = $("myCuposSection"), list = $("myCuposList"),
               summary = $("myCuposSummary"), empty = $("myCuposEmpty");
           if (!section || !list || !summary || !empty) return;
-          myCupos = rows || [];
+          /* Las rechazadas no se muestran, aunque quede alguna vieja
+             en la base: no son cupos y el jugador puede reinscribirse. */
+          myCupos = (rows || []).filter(function (r) {
+            return String(r.estado || "").toLowerCase() !== "rechazada";
+          });
           section.classList.remove("hidden");
           summary.textContent = myCuposSummaryText(myCupos);
           if (!myCupos.length) {
@@ -1350,6 +1436,7 @@
             if (meta.ff_id) $("fId").value = meta.ff_id;
             fillProfile();
             checkMyInscription();
+            loadMyRoomStates();
             loadMyCupos();
           } else {
             if (currentUser && !verified) {
@@ -1370,6 +1457,10 @@
             myInscription = null;
             myInscriptionState = "unknown";
             myInscriptionFor = null;
+            myStateByRoom = {};
+            myStateByRoomFor = null;
+            buildRooms(true);
+            renderAll();
             out.classList.remove("hidden");
             inn.classList.add("hidden");
             locked.classList.remove("hidden");
@@ -1431,48 +1522,6 @@
           }
         })();
 
-        /* Guardar la credencial en el gestor de contraseñas del navegador.
-           Los formularios se autentican solo por JS y el handler usa
-           preventDefault, así que el navegador nunca ve un envío real y
-           Safari no ofrece guardar la contraseña. Tras una autenticación
-           correcta se hace el envío real con form.submit() hacia el iframe
-           oculto "save-creds-frame": form.submit() no re-dispara el evento
-           submit (sin bucles) y el POST va al iframe, sin navegar la página.
-           Además se intenta navigator.credentials.store() (Chrome/Edge);
-           Safari no tiene esa API y simplemente no hace nada. Solo se
-           dispara con credenciales ya verificadas por Supabase, nunca con
-           un intento fallido. */
-        function restorePasswordType(inputId) {
-          var input = document.getElementById(inputId);
-          if (input) input.type = "password";
-          var toggle = document.querySelector('.pw-toggle[data-target="' + inputId + '"]');
-          if (toggle) {
-            toggle.setAttribute("aria-pressed", "false");
-            toggle.setAttribute("aria-label", "Mostrar contraseña");
-            toggle.setAttribute("title", "Mostrar contraseña");
-            var eye = toggle.querySelector(".ic-eye");
-            var eyeOff = toggle.querySelector(".ic-eye-off");
-            if (eye) eye.classList.remove("hidden");
-            if (eyeOff) eyeOff.classList.add("hidden");
-          }
-        }
-        function storePasswordCredential(email, password) {
-          try {
-            if (!navigator.credentials || typeof PasswordCredential === "undefined") return;
-            var cred = new PasswordCredential({ id: email, password: password });
-            if (navigator.credentials.store) navigator.credentials.store(cred).catch(function () {});
-          } catch (e) { /* gestor no disponible: el iframe ya dispara el aviso */ }
-        }
-        function submitToSaveCreds(formId, passInputId, email, password) {
-          /* La contraseña debe ser type="password" al enviar: si el jugador
-             la dejó visible con el ojito (type="text"), el gestor no la
-             reconoce como contraseña y no ofrece guardarla. */
-          restorePasswordType(passInputId);
-          storePasswordCredential(email, password);
-          var form = document.getElementById(formId);
-          if (form) form.submit();
-        }
-
         $("signupForm").addEventListener("submit", function (e) {
           e.preventDefault();
           authHideError("signupError");
@@ -1512,7 +1561,6 @@
             $("signupSuccess").classList.add("show");
             $("signupSuccess").scrollIntoView({ behavior: "smooth", block: "center" });
             $("liEmail").value = email;
-            submitToSaveCreds("signupForm", "suPass", email, pass);
           }).catch(function (err) {
             btn.disabled = false;
             btn.textContent = "Crear cuenta";
@@ -1548,7 +1596,6 @@
             }
             currentUser = user;
             refreshAuthUI();
-            submitToSaveCreds("loginForm", "liPass", email, pass);
             $("formatSummary").scrollIntoView({ behavior: "smooth", block: "start" });
           }).catch(function (err) {
             btn.disabled = false;
@@ -1653,7 +1700,11 @@
               '<p class="room-mode">' + roomPrizeLine(room) + "</p>" +
               '<div class="bar"><i id="cuposBar-' + i + '"></i></div>' +
               '<p id="cuposMsg-' + i + '"></p>' +
-              '<a class="btn btn-accent" href="#inscripcion" data-room-pick="' + i + '">Quiero mi cupo</a>';
+              /* El botón depende del estado del jugador en ESTA sala:
+                 aprobado o pendiente muestran su estado y NO abren el
+                 formulario; sin inscripción (o rechazada) abre el
+                 formulario como siempre. */
+              roomCtaHtml(room, i);
             list.appendChild(card);
           });
           /* El listener vive en la lista (delegado): sobrevive a los
@@ -1686,7 +1737,13 @@
           /* Mientras llega la consulta de la sala nueva, no dejar visible la
              tarjeta de cupo de la sala anterior. */
           if (changed) applyInscriptionStatus();
-          if (changed && currentUser && isVerified(currentUser)) checkMyInscription();
+          /* Re-comprobar SIEMPRE al tocar una tarjeta, también cuando la
+             sala ya era la elegida: antes solo se consultaba al cambiar
+             de sala, así que tocar la tarjeta de la sala actual nunca
+             actualizaba el estado y el formulario quedaba visible. Con
+             la caché por (correo, sala) la consulta no se repite si el
+             estado de esa sala ya se conoce. */
+          if (currentUser && isVerified(currentUser)) checkMyInscription(changed);
         }
         function applyRoomToForm(room) {
           if (!room) return;
@@ -1907,6 +1964,11 @@
               };
               myInscriptionState = "pendiente";
               myInscriptionFor = email + "||" + NEXT_ROOM.title;
+              /* La tarjeta de esa sala ya no ofrece "Quiero mi cupo":
+                 pasa a "Pendiente de aprobación" sin recargar. */
+              myStateByRoom[NEXT_ROOM.title] = "pendiente";
+              buildRooms(true);
+              renderAll();
             } else if (saveBlockedDuplicate) {
               /* El índice único rechazó el duplicado: refrescar la
                  tarjeta de estado con la fila real y avisar. */
@@ -2029,6 +2091,16 @@
             loadMyCupos();
           }
           if (view === "register") {
+            /* Al abrir el formulario, re-comprobar el estado del cupo en
+               la sala elegida: el formulario queda oculto mientras llega
+               la consulta y solo vuelve a aparecer si no hay inscripción
+               activa (pendiente o aprobada) en esa sala. Si la consulta
+               falla, el formulario se muestra como siempre. */
+            if (NEXT_ROOM && currentUser && isVerified(currentUser)) {
+              $("formatSummary").classList.add("hidden");
+              $("regForm").classList.add("hidden");
+              checkMyInscription(true);
+            }
             /* La vista acaba de hacerse visible: es el momento seguro para
                crear los captchas (antes estaban en un contenedor oculto). */
             setTimeout(renderVisibleTurnstiles, 0);
