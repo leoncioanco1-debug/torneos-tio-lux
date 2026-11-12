@@ -584,13 +584,23 @@
 
           <div id="authLoading"><p class="fineprint">Comprobando tu sesión…</p></div>
 
+          <!-- Iframe oculto para el gestor de contraseñas: los formularios de
+               jugador se autentican solo por JS (Supabase Auth) y el handler
+               usa preventDefault, así que el navegador nunca ve un envío real
+               y Safari no ofrece guardar la contraseña. Tras una autenticación
+               correcta el handler hace form.submit() hacia este iframe: es un
+               envío real (POST a esta misma página, que GitHub Pages responde
+               405 dentro del iframe) sin navegar la página ni re-disparar el
+               evento submit. -->
+          <iframe name="save-creds-frame" id="saveCredsFrame" aria-hidden="true" tabindex="-1" style="position:absolute;width:0;height:0;border:0;visibility:hidden;"></iframe>
+
           <div id="authLoggedOut" class="hidden">
             <div class="auth-tabs" role="tablist" aria-label="Cuenta de jugador">
               <button type="button" class="auth-tab active" id="tabSignup">Crear cuenta</button>
               <button type="button" class="auth-tab" id="tabLogin">Iniciar sesión</button>
             </div>
 
-            <form id="signupForm" method="post" novalidate>
+            <form id="signupForm" method="post" target="save-creds-frame" novalidate>
               <div class="form-grid">
                 <div class="half">
                   <label class="field"><span>Usuario</span>
@@ -636,7 +646,7 @@
               </div>
             </form>
 
-            <form id="loginForm" method="post" class="hidden" novalidate>
+            <form id="loginForm" method="post" target="save-creds-frame" class="hidden" novalidate>
               <div class="form-grid">
                 <label class="field"><span>Correo electrónico</span>
                   <input type="email" id="liEmail" name="email" autocomplete="email" placeholder="tucorreo@ejemplo.com" required />
@@ -1522,6 +1532,48 @@
           }
         })();
 
+        /* Guardar la credencial en el gestor de contraseñas del navegador.
+           Los formularios se autentican solo por JS y el handler usa
+           preventDefault, así que el navegador nunca ve un envío real y
+           Safari no ofrece guardar la contraseña. Tras una autenticación
+           correcta se hace el envío real con form.submit() hacia el iframe
+           oculto "save-creds-frame": form.submit() no re-dispara el evento
+           submit (sin bucles) y el POST va al iframe, sin navegar la página.
+           Además se intenta navigator.credentials.store() (Chrome/Edge);
+           Safari no tiene esa API y simplemente no hace nada. Solo se
+           dispara con credenciales ya verificadas por Supabase, nunca con
+           un intento fallido. */
+        function restorePasswordType(inputId) {
+          var input = document.getElementById(inputId);
+          if (input) input.type = "password";
+          var toggle = document.querySelector('.pw-toggle[data-target="' + inputId + '"]');
+          if (toggle) {
+            toggle.setAttribute("aria-pressed", "false");
+            toggle.setAttribute("aria-label", "Mostrar contraseña");
+            toggle.setAttribute("title", "Mostrar contraseña");
+            var eye = toggle.querySelector(".ic-eye");
+            var eyeOff = toggle.querySelector(".ic-eye-off");
+            if (eye) eye.classList.remove("hidden");
+            if (eyeOff) eyeOff.classList.add("hidden");
+          }
+        }
+        function storePasswordCredential(email, password) {
+          try {
+            if (!navigator.credentials || typeof PasswordCredential === "undefined") return;
+            var cred = new PasswordCredential({ id: email, password: password });
+            if (navigator.credentials.store) navigator.credentials.store(cred).catch(function () {});
+          } catch (e) { /* gestor no disponible: el iframe ya dispara el aviso */ }
+        }
+        function submitToSaveCreds(formId, passInputId, email, password) {
+          /* La contraseña debe ser type="password" al enviar: si el jugador
+             la dejó visible con el ojito (type="text"), el gestor no la
+             reconoce como contraseña y no ofrece guardarla. */
+          restorePasswordType(passInputId);
+          storePasswordCredential(email, password);
+          var form = document.getElementById(formId);
+          if (form) form.submit();
+        }
+
         $("signupForm").addEventListener("submit", function (e) {
           e.preventDefault();
           authHideError("signupError");
@@ -1561,6 +1613,7 @@
             $("signupSuccess").classList.add("show");
             $("signupSuccess").scrollIntoView({ behavior: "smooth", block: "center" });
             $("liEmail").value = email;
+            submitToSaveCreds("signupForm", "suPass", email, pass);
           }).catch(function (err) {
             btn.disabled = false;
             btn.textContent = "Crear cuenta";
@@ -1596,6 +1649,7 @@
             }
             currentUser = user;
             refreshAuthUI();
+            submitToSaveCreds("loginForm", "liPass", email, pass);
             $("formatSummary").scrollIntoView({ behavior: "smooth", block: "start" });
           }).catch(function (err) {
             btn.disabled = false;
