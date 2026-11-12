@@ -1494,7 +1494,19 @@
         /* Lista vaciada el 2026-11-12 tras el borrado total en el panel del
            organizador: al abrir una sala nueva hay que republicar con la
            lista actualizada. */
-        var ROOMS = [];
+        var ROOMS = [
+          {
+            title: "Sala Duo Tio Lux",
+            dateText: "17 de Noviembre",
+            timeText: "9:00 p. m.",
+            modo: "duo",
+            formato: "podio",
+            scheme: "podio",
+            capacity: 48,
+            minPlayers: 36,
+            confirmedPlayers: 0
+          }
+        ];
         var NEXT_ROOM = ROOMS[0] || null;
         function approvedPlayers(roomTitle) {
           return state.regs.filter(function (r) { return r.status === "aprobado" && r.sala === roomTitle; })
